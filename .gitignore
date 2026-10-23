@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env*
+!.env.example
+CONTRACT.md
+playwright-report/
+test-results/
+*.log
+private/
+reference/
+access.txt
+*.zip
+*.pdf
+*.apkg
