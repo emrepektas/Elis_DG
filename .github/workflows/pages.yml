@@ -4,12 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      deploy:
-        description: Publish this checked build to GitHub Pages
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -32,12 +26,10 @@ jobs:
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && inputs.deploy
         with:
           path: dist
 
   deploy:
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy
     needs: check
     runs-on: ubuntu-latest
     permissions:
