@@ -2,15 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Story } from '../types';
-import { Avatar, AVATAR_IDS, type AvatarId } from './Avatars';
+import { Avatar, AVATAR_IDS, type AvatarId, type AvatarPose } from './Avatars';
 import { Landscape, OpeningClouds } from './Landscape';
 import { NoteFlower } from './Discoveries';
 import { Celebration } from './Celebration';
+import { FruitFlies, VoyageMarkers, voyageStart, sailStep } from './Voyage';
 import { Boat, Book, Ball, Box, Flower, Pole } from '../world/models';
 import { FLOWERS, GIFT, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
 
 export interface Input { keys: Set<string>; yaw: number; pitch: number; press: number }
-export interface Status { action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number }
+export interface Status { action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number; checkpoint?:number; gates?:number; voyageEvent?:string }
 export interface GameProps {
   phase: Phase; avatar: AvatarId; story: Story; flowers: number[];
   input: React.MutableRefObject<Input>; blocked: boolean; motion: boolean; reduced: boolean;
@@ -25,6 +26,7 @@ function Engine(p: GameProps) {
   const player = useRef<THREE.Group>(null), boat = useRef<THREE.Group>(null), sleeper = useRef<THREE.Group>(null), blanket = useRef<THREE.Mesh>(null);
   const lamp = useRef<THREE.PointLight>(null), sun = useRef<THREE.DirectionalLight>(null), sky = useRef<THREE.HemisphereLight>(null);
   const book = useRef<THREE.Group>(null), bobber = useRef<THREE.Group>(null), rod = useRef<THREE.Group>(null), wake = useRef<THREE.Group>(null);
+  const voyage=useRef(voyageStart());
   const time = useRef(0), report = useRef(0), done = useRef(false), previous = useRef(p.phase), seenPress = useRef(0);
   const fish = useRef('idle'), fishTime = useRef(0), reel = useRef(0), sleep = useRef(0);
   const cameraTarget = useRef(new THREE.Vector3(-5.5,29,-15)), cameraPosition = useRef(new THREE.Vector3(-5.5,40,22));
@@ -45,7 +47,7 @@ function Engine(p: GameProps) {
     phaseStartPosition.current.set(walker.current.x,walker.current.y,walker.current.z);
     if(p.phase==='welcome'||p.phase==='choose'){walker.current={...spawn};boatPosition.current.set(5,.1,-4);fish.current='idle';reel.current=0;sleep.current=0;}
     if(p.phase==='coast'){p.input.current.yaw=0;p.input.current.pitch=.05;}
-    if(p.phase==='sail')p.input.current.yaw=-.9;
+    if(p.phase==='sail'){p.input.current.yaw=-.9;voyage.current=voyageStart();}
     if(p.phase==='fish'){fish.current='idle';fishTime.current=0;reel.current=0;}
     if(p.phase==='garden'){walker.current={...spawn,x:43,z:-4,facing:Math.PI/2};p.input.current.yaw=-Math.PI/2;p.input.current.pitch=.05;}
     previous.current=p.phase;
@@ -80,9 +82,9 @@ function Engine(p: GameProps) {
       const q=smooth(t/2); walker.current.x=lerp(phaseStartPosition.current.x,5.3,q);walker.current.z=lerp(phaseStartPosition.current.z,-3.7,q);walker.current.y=Math.sin(q*Math.PI)*1.1+q*.7;
     }
     if(phase==='sail'){
-      const speed=keys.has('KeyW')?3.1:keys.has('KeyS')?.55:1.6;
-      boatPosition.current.x=Math.min(22,boatPosition.current.x+dt*speed);
-      boatPosition.current.z=clamp(boatPosition.current.z+(Number(keys.has('KeyD'))-Number(keys.has('KeyA')))*dt*2.2,-7,-1);
+      voyage.current=sailStep(voyage.current,keys,dt,p.assist);
+      boatPosition.current.set(voyage.current.x,.1,voyage.current.z);
+      if(voyage.current.bump>0)action='wave-bump';
       if(boatPosition.current.x>=22&&!done.current){done.current=true;p.onPhase('fish');}
     }
     if(phase==='fish'){
@@ -95,11 +97,11 @@ function Engine(p: GameProps) {
     }
     if(phase==='notebook'){action='book';if(pressed)p.onInteract('book');}
     const dark=lightAt(phase,t);
-    sleep.current=phase==='bedtime'?smooth(t/3.5):phase==='night'?1-smooth((t-6.3)/1.7):0;
-    if(phase==='night') boatPosition.current.set(lerp(22,38,smooth(t/8)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
+    sleep.current=phase==='bedtime'?smooth(t/5):phase==='night'?1-smooth((t-16)/4):0;
+    if(phase==='night') boatPosition.current.set(lerp(22,38,smooth(t/20)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
     if(phase==='arrival'){
       boatPosition.current.set(38,.1,-4);
-      const q=smooth(t/4);walker.current.x=lerp(38.5,43,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
+      const q=smooth((t-8)/4);walker.current.x=lerp(38.5,43,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
     }
     if(duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
       done.current=true;
@@ -107,20 +109,28 @@ function Engine(p: GameProps) {
       p.onPhase(next[phase]!);
     }
     if(player.current){
-      player.current.visible=['coast','garden','gifts','board','arrival'].includes(phase);
+      player.current.visible=['coast','garden','gifts','board'].includes(phase)||(phase==='arrival'&&t>=8);
       player.current.position.set(walker.current.x,walker.current.y,walker.current.z);
       player.current.rotation.y=phase==='board'||phase==='arrival'?Math.PI/2:walker.current.facing;
     }
-    if(boat.current){boat.current.position.copy(boatPosition.current);boat.current.rotation.y=phase==='sail'?(Number(keys.has('KeyA'))-Number(keys.has('KeyD')))*.08:0;
+    if(boat.current){boat.current.position.copy(boatPosition.current);boat.current.rotation.y=phase==='sail'?-voyage.current.velocity*.12:0;boat.current.rotation.z=phase==='sail'&&p.motion?Math.sin(t*1.8)*.055+voyage.current.bump*Math.sin(t*15)*.04:0;boat.current.rotation.x=phase==='sail'&&p.motion?Math.sin(t*1.55)*.045:0;
       const sail=boat.current.getObjectByName('red-sail');if(sail){sail.scale.y=1-sleep.current*.98;sail.position.y=1.29-sleep.current*.2;}}
     if(sleeper.current){sleeper.current.rotation.z=-Math.PI/2*sleep.current;sleeper.current.position.y=.65+sleep.current*.03;}
     if(blanket.current){blanket.current.visible=sleep.current>.01;blanket.current.scale.setScalar(Math.max(.01,sleep.current));}
     if(lamp.current)lamp.current.intensity=dark*5;
     if(sun.current){sun.current.intensity=lerp(2.6,.12,dark);sun.current.color.set(dark>.35?'#bdcce8':'#fff0ce');}
     if(sky.current)sky.current.intensity=lerp(2.1,.45,dark);
-    if(bobber.current){bobber.current.visible=phase==='fish'&&fish.current!=='idle';bobber.current.position.set(boatPosition.current.x+2.6,-.02+Math.sin(t*(fish.current==='bite'?12:2))*.05,-2);}
+    if(bobber.current){bobber.current.visible=phase==='fish'&&fish.current!=='idle';bobber.current.position.set(boatPosition.current.x+2.6,-.02+Math.sin(t*(fish.current==='bite'?12:2))*.05,boatPosition.current.z+2);}
     if(rod.current)rod.current.rotation.z=fish.current==='bite'?Math.sin(t*8)*.04-.15:-.3;
-    if(book.current){book.current.visible=['haul','notebook','bedtime'].includes(phase);const q=phase==='haul'?smooth(t/1.8):1;book.current.position.set(boatPosition.current.x+lerp(2.6,.5,q),lerp(-.2,.95,q)+Math.sin(q*Math.PI)*1.8,lerp(-2,boatPosition.current.z+.2,q));book.current.rotation.z=(1-q)*-.3;}
+    if(book.current){
+      book.current.visible=['coast','board','sail','fish','haul','notebook','bedtime','night','arrival','garden','gifts'].includes(phase);
+      let x=-1,y=.83,z=-.12;
+      if(phase==='sail'&&t>Math.max(56,voyage.current.elapsed-1)&&boatPosition.current.x>21.5){const q=clamp((boatPosition.current.x-21.5)/.5,0,1);x=lerp(-1,2.6,q);y=lerp(.83,-.2,q)+Math.sin(q*Math.PI)*.65;z=lerp(-.12,2,q);}
+      if(phase==='fish'){x=2.6;y=-.1+Math.sin(t*2)*.05;z=2;}
+      if(phase==='haul'){const q=smooth(t/1.8);x=lerp(2.6,-1,q);y=lerp(-.1,.83,q)+Math.sin(q*Math.PI)*1.8;z=lerp(2,-.12,q);}
+      book.current.position.set(boatPosition.current.x+x,boatPosition.current.y+y,boatPosition.current.z+z);
+      book.current.rotation.z=phase==='fish'?-.12:0;book.current.scale.setScalar(.55);
+    }
     if(wake.current){wake.current.visible=['sail','night'].includes(phase);wake.current.position.copy(boatPosition.current);wake.current.children.forEach((object,i)=>{const q=((t*.55+i/10)%1);object.position.set(-.7-q*3,-.13,Math.sin(i*12)*(.4+q*.6));object.scale.set(.2+q*.5,.025,.06+q*.08);const m=(object as THREE.Mesh).material as THREE.MeshBasicMaterial;m.opacity=(1-q)*.7;});}
     // Camera mode changes follow a continuous position/target blend instead of replacing the world.
     const land=['coast','garden','gifts'].includes(phase),selected=phase==='choose';
@@ -138,11 +148,12 @@ function Engine(p: GameProps) {
       let yaw=p.input.current.yaw,range=7.5,height=3.5;
       if(phase==='board'){const q=smooth(t/2);target.lerp(new THREE.Vector3(walker.current.x,.8,walker.current.z),1-q);yaw=lerp(0,-.9,q);}
       if(phase==='haul'||phase==='notebook'){range=5.8;height=3;}
-      if(phase==='bedtime'){yaw=lerp(-.8,.9,smooth(t/3.5));range=5.8;height=2.1;}
-      if(phase==='night'){const dawn=smooth((t-4.4)/3.6);yaw=lerp(.9,-1.4,dawn);range=lerp(5.8,11,dawn);height=lerp(2.1,5,dawn);}
-      if(phase==='arrival'){const q=smooth(t/4);target.lerp(new THREE.Vector3(walker.current.x,1,walker.current.z),q);yaw=lerp(-1.2,-Math.PI/2,q);range=lerp(9,5.2,q);height=lerp(4,1.7,q);}
+      if(phase==='bedtime'){yaw=lerp(-.8,.9,smooth(t/5));range=5.8;height=2.1;}
+      if(phase==='night'){const dawn=smooth((t-14)/6);yaw=lerp(.9,-1.4,dawn);range=lerp(5.8,11,dawn);height=lerp(2.1,5,dawn);}
+      if(phase==='arrival'){const q=smooth((t-8)/4);target.lerp(new THREE.Vector3(walker.current.x,1,walker.current.z),q);yaw=lerp(-1.2,-Math.PI/2,q);range=lerp(9,5.2,q);height=lerp(4,1.7,q);}
       desired.set(target.x+Math.sin(yaw)*range,target.y+height,target.z+Math.cos(yaw)*range);
     }
+    if(phase==='arrival'&&t>=3&&t<7){target.set(41.8,.3,-2.6);desired.set(40.4,1.25,-.7);}
     const blend=p.reduced?1:1-Math.exp(-Math.min(rawDelta,.05)*5.5);
     cameraPosition.current.lerp(desired,blend);cameraTarget.current.lerp(target,blend);camera.position.copy(cameraPosition.current);camera.lookAt(cameraTarget.current);
     if(land){
@@ -164,37 +175,49 @@ function Engine(p: GameProps) {
     if(moving!==walking)setWalking(moving);
     report.current+=rawDelta;
     if(report.current>.1){report.current=0;if(Math.abs(night-dark)>.015)setNight(dark);
-      p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/17,0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t});
-      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),night:String(dark),bouquet:String(p.flowers.length),cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
+      p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/17,0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
+      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),boatZ:String(boatPosition.current.z),checkpoint:String(voyage.current.checkpoint),gates:String(voyage.current.gates),night:String(dark),bouquet:String(p.flowers.length),cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
     }
   });
-  const afloat=!['welcome','descent','choose','coast','board','arrival','garden','gifts','celebration'].includes(p.phase);
+  const afloat=!['welcome','descent','choose','coast','board','garden','gifts','celebration'].includes(p.phase);
   const sleepPhase=['bedtime','night'].includes(p.phase);
+  const pose=(id:AvatarId):AvatarPose=>{
+    if(p.phase==='arrival')return time.current>=6&&time.current<8?'laugh':id==='stone'&&time.current>=3&&time.current<6?'point':'idle';
+    if(p.phase==='bedtime'&&id==='blue')return time.current<2?'book':'sleep';
+    if(sleepPhase)return 'sleep';
+    if(p.phase==='sail'&&voyage.current.bump>0)return id==='capybara'?'wave':'cheer';
+    if(p.phase==='coast'&&time.current<5)return id==='child'?'point':id==='stone'?'reach':id==='penguin'?'sit':'idle';
+    return 'idle';
+  };
   return <>
     <hemisphereLight ref={sky} args={['#fff4db','#7eaa83',2.1]}/>
     <directionalLight ref={sun} position={[20,32,18]} intensity={2.6} color="#fff0ce" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-38} shadow-camera-right={40} shadow-camera-top={28} shadow-camera-bottom={-30} shadow-normalBias={.04}/>
     <Landscape night={night} motion={p.motion} selection={['welcome','descent','choose'].includes(p.phase)} celebration={p.phase==='celebration'}/>
     {(p.phase==='welcome'||p.phase==='descent')&&<OpeningClouds motion={p.motion}/>}
-    <group ref={player}><Avatar id={p.avatar} walking={walking} bouquet={p.flowers.length} motion={p.motion}/></group>
+    <VoyageMarkers active={['sail','fish','haul'].includes(p.phase)} motion={p.motion} progress={voyage}/>
+    <FruitFlies motion={p.motion}/>
+    <group ref={player}><Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={p.flowers.length} motion={p.motion}/></group>
     {(p.phase==='choose'||p.phase==='descent')&&<SelectionLineup avatar={p.avatar} motion={p.motion} select={p.onAvatar}/>}
     {p.phase==='celebration'&&<group position={[60,0,-6]}><Celebration motion={p.motion}/></group>}
     <group ref={boat}><Boat animate={p.motion}>
-      {afloat&&p.avatar!=='blue'&&<group position={[-.8,.65,-.12]} rotation={[0,.6,0]}><Avatar id={p.avatar} scale={.7} motion={p.motion} sleeping={sleepPhase}/></group>}
-      {(afloat||((p.phase==='coast'||p.phase==='board')&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" scale={.67} motion={p.motion} sleeping={sleepPhase}/></group>}
-      {afloat&&p.avatar!=='stone'&&<group position={[-.8,.65,.3]}><Avatar id="stone" scale={.55} motion={p.motion}/></group>}
-      {afloat&&p.avatar!=='penguin'&&<group position={[-.1,.65,.4]}><Avatar id="penguin" scale={.5} motion={p.motion}/></group>}
+      {afloat&&p.phase!=='arrival'&&p.avatar!=='blue'&&<group position={[-.8,.65,-.12]} rotation={[0,.6,0]}><Avatar id={p.avatar} pose={pose(p.avatar)} scale={.7} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {((afloat&&(p.phase!=='arrival'||p.avatar!=='blue'))||((p.phase==='coast'||p.phase==='board')&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" pose={pose('blue')} scale={.67} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {afloat&&p.avatar!=='stone'&&<group position={[-.8,.65,.3]}><Avatar id="stone" pose={pose('stone')} scale={.55} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {afloat&&p.avatar!=='capybara'&&<group position={[-1.05,.65,-.35]}><Avatar id="capybara" pose={pose('capybara')} scale={.5} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {afloat&&p.avatar!=='child'&&<group position={[.1,.65,-.36]}><Avatar id="child" pose={pose('child')} scale={.5} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {afloat&&p.avatar!=='penguin'&&<group position={[-.1,.65,.4]}><Avatar id="penguin" pose={pose('penguin')} scale={.5} motion={p.motion} sleeping={sleepPhase}/ ></group>}
       <mesh ref={blanket} geometry={blanketGeometry} position={[.85,.87,0]} rotation={[-Math.PI/2,0,0]}><meshStandardMaterial color="#e85e5c" side={THREE.DoubleSide} roughness={.95}/></mesh>
       <group position={[-1,.75,-.35]}><Ball at={[0,.1,0]} scale={[.09,.13,.09]} color="#ffdda1"/><pointLight ref={lamp} color="#ffc578" intensity={0} distance={6}/></group>
       {p.phase==='fish'&&<group ref={rod} position={[.7,.9,.2]}><Pole from={[0,0,0]} to={[1.5,1.7,.9]} radius={.025} color="#a27b54"/></group>}
     </Boat></group>
     <group ref={wake}>{Array.from({length:10},(_,i)=><mesh key={i}><sphereGeometry args={[1,8,4]}/><meshBasicMaterial color="#e5fff3" transparent opacity={.5}/></mesh>)}</group>
     <group ref={bobber}><Ball at={[0,.1,0]} scale={[.12,.2,.12]} color="#ef8876"/><mesh rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.4,.43,32]}/><meshBasicMaterial color="#fff4d5" side={THREE.DoubleSide}/></mesh></group>
-    {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,-2]} color="#fff1ca" radius={.008}/>}
+    {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,boatPosition.current.z+2]} color="#fff1ca" radius={.008}/>}
     <group ref={book}><Book open={p.phase==='notebook'}/></group>
     {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]} userData={{actor:true}}><NoteFlower index={i} picked={p.flowers.includes(i)} active={p.phase==='garden'&&distance([walker.current.x,walker.current.z],[x,z])<3} motion={p.motion}/></group>)}
     {p.phase!=='celebration'&&<group position={[60,.1,-6]}><Box at={[0,.43,0]} scale={[1,.8,.8]} color="#a9c4a8"/><Box at={[0,.86,0]} scale={[1.08,.14,.88]} color="#d1dfbc"/><Box at={[0,.95,0]} scale={[1.1,.02,.12]} color="#fff0c6"/><Box at={[0,.95,0]} scale={[.12,.02,.9]} color="#fff0c6"/><mesh position={[0,1.06,0]}><torusGeometry args={[.17,.035,8,20]}/><meshStandardMaterial color="#fff0c6"/></mesh></group>}
     {(p.phase==='garden'||p.phase==='gifts')&&<Companions walker={walker} avatar={p.avatar} motion={p.motion} walking={walking}/>}
-    {p.phase==='coast'&&<group position={[-1.5,0,-2.6]} userData={{actor:true}}>{p.avatar!=='stone'&&<Avatar id="stone" scale={.8} motion={p.motion}/>}{p.avatar!=='penguin'&&<group position={[-1.4,0,.3]}><Avatar id="penguin" scale={.65} motion={p.motion}/></group>}</group>}
+    {p.phase==='coast'&&<group position={[-1.5,0,-2.6]} userData={{actor:true}}>{p.avatar!=='stone'&&<Avatar id="stone" pose={pose('stone')} scale={.8} motion={p.motion}/>}{p.avatar!=='penguin'&&<group position={[-1.4,0,.3]}><Avatar id="penguin" pose={pose('penguin')} scale={.65} motion={p.motion}/></group>}</group>}
   </>;
 }
 function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;select:(id:AvatarId)=>void}){

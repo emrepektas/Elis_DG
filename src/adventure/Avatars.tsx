@@ -6,8 +6,11 @@ import { Ball, Pole } from '../world/models';
 export const AVATAR_IDS = ['blue', 'stone', 'penguin', 'capybara', 'child'] as const;
 export type AvatarId = typeof AVATAR_IDS[number];
 
+export type AvatarPose = 'idle' | 'point' | 'laugh' | 'cheer' | 'sit' | 'wave' | 'dance' | 'clap' | 'reach' | 'book' | 'sleep';
+
 export interface AvatarProps {
   id: AvatarId;
+  pose?: AvatarPose;
   walking?: boolean;
   bouquet?: number;
   sleeping?: boolean;
@@ -95,7 +98,8 @@ function Badge() {
 }
 
 /** Procedural toy figures, approximately 1.4 units tall, feet at y=0, facing +Z. */
-export function Avatar({ id, walking = false, bouquet = 0, sleeping = false, motion = true, scale = 1 }: AvatarProps) {
+export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleeping = false, motion = true, scale = 1 }: AvatarProps) {
+  sleeping = sleeping || pose === 'sleep';
   const root = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
   const leftArm = useRef<THREE.Group>(null);
@@ -104,6 +108,7 @@ export function Avatar({ id, walking = false, bouquet = 0, sleeping = false, mot
   const rightLeg = useRef<THREE.Group>(null);
   const cape = useRef<THREE.Group>(null);
   const phase = useRef(0);
+  const poseBlend = useRef({ x: 0, z: 0, y: 0, head: 0, lx: 0, lz: 0, rx: 0, rz: 0, ly: 0, ry: 0 });
   useFrame(({ clock }, delta) => {
     phase.current += Math.min(delta, .05) * (walking && !sleeping ? 8 : 1.6);
     const step = motion && walking && !sleeping ? Math.sin(phase.current) : 0;
@@ -128,6 +133,33 @@ export function Avatar({ id, walking = false, bouquet = 0, sleeping = false, mot
       rightArm.current.rotation.x = sleeping ? -.28 : step * .35;
       rightArm.current.rotation.z = .06 - idle * .015;
     }
+    // Blend gestures instead of snapping a whole figure into a new pose.
+    // Body, head and broad mitten movements remain legible at game-camera distance.
+    const t = clock.elapsedTime;
+    const beat = motion ? Math.sin(t * 7) : 0;
+    const gesture = { x: 0, z: 0, y: 0, head: 0, lx: 0, lz: 0, rx: 0, rz: 0, ly: 0, ry: 0 };
+    if (pose === 'point') { gesture.rx = -1.28; gesture.rz = -.28; gesture.head = -.08; }
+    if (pose === 'reach' || pose === 'book') { gesture.rx = -1.15; gesture.lx = -.95; gesture.x = .13; gesture.head = .18; }
+    if (pose === 'sit' || pose === 'sleep') { gesture.ly = gesture.ry = -1.05; gesture.y = -.17; gesture.head = .2; }
+    if (pose === 'laugh') { gesture.x = -.1 + beat * .035; gesture.head = -.17; gesture.lx = -.7; gesture.rx = -.65; gesture.y = Math.abs(beat) * .025; }
+    if (pose === 'cheer') { gesture.lz = 2.45; gesture.rz = -2.45; gesture.y = Math.max(0, beat) * .045; }
+    if (pose === 'wave') { gesture.rz = -2.35 + beat * .22; gesture.rx = -.2; gesture.head = -.06; }
+    if (pose === 'clap') { gesture.rx = gesture.lx = -1.15; gesture.lz = -.35 - beat * .25; gesture.rz = .35 + beat * .25; gesture.y = Math.abs(beat) * .025; }
+    if (pose === 'dance') {
+      gesture.z = beat * (id === 'penguin' ? .17 : .09);
+      gesture.lz = 1.1 + beat * .6; gesture.rz = -1.1 + beat * .6;
+      gesture.lx = Math.cos(t * 7) * .45; gesture.rx = -gesture.lx;
+      gesture.ly = beat * .35; gesture.ry = -beat * .35;
+      gesture.head = Math.sin(t * 3.5) * .1;
+    }
+    const blend = poseBlend.current;
+    for (const key of Object.keys(blend) as (keyof typeof blend)[]) blend[key] = THREE.MathUtils.damp(blend[key], gesture[key], 11, Math.min(delta, .05));
+    if (root.current) { root.current.position.y += blend.y; root.current.rotation.x = blend.x; root.current.rotation.z += blend.z; }
+    if (head.current) head.current.rotation.x += blend.head;
+    if (leftArm.current) { leftArm.current.rotation.x += blend.lx; leftArm.current.rotation.z += blend.lz; }
+    if (rightArm.current) { rightArm.current.rotation.x += blend.rx; rightArm.current.rotation.z += blend.rz; }
+    if (leftLeg.current) leftLeg.current.rotation.x += blend.ly;
+    if (rightLeg.current) rightLeg.current.rotation.x += blend.ry;
     if (cape.current) cape.current.rotation.x = motion ? .12 + Math.abs(step) * .16 + Math.sin(clock.elapsedTime * 2.1) * .025 : .12;
   });
 

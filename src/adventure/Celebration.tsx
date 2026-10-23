@@ -1,7 +1,7 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Avatar, type AvatarId } from './Avatars';
+import { Avatar, type AvatarId, type AvatarPose } from './Avatars';
 
 interface CelebrationProps { motion: boolean }
 
@@ -18,40 +18,73 @@ const random = (seed: number) => {
   return number - Math.floor(number);
 };
 
-function Dancer({ id, x, z, phase, motion }: typeof PARTY[number] & CelebrationProps) {
+// One shared timeline keeps all five figures, solos and confetti on the beat.
+// 0–3 entrance; 3–7 shared claps; 7–22 five solos; 22–26 jump;
+// 26–30 a wave to the audience, followed by a relaxed group loop.
+function Dancer({ id, x, z, phase, motion, timeline, index }: typeof PARTY[number] & CelebrationProps & {
+  timeline: { current: number }; index: number;
+}) {
   const feet = useRef<THREE.Group>(null), body = useRef<THREE.Group>(null);
-  const elapsed = useRef(0);
-  useFrame((_, delta) => {
+  const [pose, setPose] = useState<AvatarPose>('wave');
+  const currentPose = useRef<AvatarPose>('wave');
+  useFrame(() => {
     if (!feet.current || !body.current) return;
-    if (motion) elapsed.current += Math.min(delta, .05);
-    const t = elapsed.current, beat = t * 3.8 + phase;
-    let hop = motion ? Math.max(0, Math.sin(beat)) ** 2 * (id === 'penguin' ? .3 : .16) : .04;
-    let spin = motion ? Math.sin(t * 1.9 + phase) * .26 : (phase % 2 ? -.08 : .08);
-    let flip = 0;
-    // One little penguin trick, with a complete airborne arc and soft landing.
-    const trick = (t + 8) % 13;
-    if (motion && id === 'penguin' && trick < 1.05) {
-      const progress = trick / 1.05;
-      hop = Math.sin(progress * Math.PI) * 1.35;
-      flip = -Math.PI * 2 * (progress * progress * (3 - 2 * progress));
+    const t = timeline.current, beat = t * 7;
+    const solo = t >= 7 && t < 22 ? Math.floor((t - 7) / 3) : -1;
+    const isSolo = solo === index;
+    const entrance = motion ? THREE.MathUtils.smoothstep(t, index * .2, 2.2 + index * .2) : 1;
+    let hop = 0, spin = 0, flip = 0, lean = 0, forward = 0;
+    let nextPose: AvatarPose = 'dance';
+    if (t < 3) {
+      nextPose = id === 'stone' ? 'point' : 'wave';
+      hop = Math.abs(Math.sin(t * 7 + phase)) * .07;
+    } else if (t < 7) {
+      nextPose = 'clap'; hop = Math.max(0, Math.sin(beat)) * .075;
+    } else if (solo >= 0) {
+      nextPose = isSolo ? 'dance' : 'clap';
+      const progress = ((t - 7) % 3) / 3;
+      const envelope = Math.sin(progress * Math.PI) ** 2;
+      if (isSolo) {
+        forward = envelope * .65;
+        hop = Math.abs(Math.sin(beat)) * .14;
+        if (id === 'blue' || id === 'capybara') spin = THREE.MathUtils.smoothstep(progress, .2, .8) * Math.PI * 2;
+        if (id === 'stone') { lean = Math.sin(beat) * .16; nextPose = progress < .2 ? 'point' : 'dance'; }
+        if (id === 'child') { nextPose = 'cheer'; hop = Math.abs(Math.sin(beat * .5)) * .45; }
+        if (id === 'penguin' && progress > .25 && progress < .75) {
+          const flipProgress = (progress - .25) * 2;
+          hop = Math.sin(flipProgress * Math.PI) * 1.25;
+          flip = -Math.PI * 2 * THREE.MathUtils.smoothstep(flipProgress, 0, 1);
+        }
+      } else {
+        spin = Math.atan2(PARTY[solo].x - x, 5);
+        hop = Math.max(0, Math.sin(beat + phase)) * .035;
+      }
+    } else if (t < 26) {
+      nextPose = 'cheer';
+      const jump = (t - 23) / 1.1;
+      if (jump > 0 && jump < 1) hop = Math.sin(jump * Math.PI) * .9;
+      if (t < 23) lean = -.12 * Math.sin((t - 22) * Math.PI);
+    } else if (t < 30) {
+      nextPose = 'wave'; spin = Math.sin(t * 1.5 + phase) * .1;
+    } else {
+      nextPose = Math.floor((t - 30) / 4) % 3 === 2 ? 'clap' : 'dance';
+      hop = Math.max(0, Math.sin(beat + phase)) * (id === 'penguin' ? .24 : .1);
+      spin = Math.sin(t * 1.2 + phase) * .22;
     }
-    // The blue mascot occasionally turns all the way around, then faces the party again.
-    const twirl = (t + 5) % 11;
-    if (motion && id === 'blue' && twirl < 1.3) {
-      const progress = twirl / 1.3;
-      spin += Math.PI * 2 * (progress * progress * (3 - 2 * progress));
-    }
-    feet.current.position.set(x, hop, z);
-    body.current.rotation.set(flip, spin, motion ? Math.sin(beat) * .09 : Math.sin(phase) * .08);
+    if (!motion) nextPose = 'cheer';
+    if (nextPose !== currentPose.current) { currentPose.current = nextPose; setPose(nextPose); }
+    feet.current.position.set(x + (motion ? Math.sin(beat * .5) * .07 : 0), motion ? hop : 0, z + (1 - entrance) * 2.3 + forward);
+    body.current.rotation.set(motion ? flip : 0, motion ? spin : 0, motion ? lean : 0);
+    feet.current.userData.choreography = t < 3 ? 'entrance' : t < 7 ? 'claps' : solo >= 0 ? `solo-${PARTY[solo].id}` : t < 26 ? 'shared-jump' : t < 30 ? 'wave' : 'loop';
   });
-  return <group ref={feet} position={[x, .04, z]}>
-    <group ref={body} position={[0, .8, 0]} rotation={[0, 0, Math.sin(phase) * .08]}>
-      <group position={[0, -.8, 0]}><Avatar id={id} scale={1.1} walking={motion} motion={motion} /></group>
+  return <group ref={feet} position={[x, .04, z]} name={`dancer-${id}`}>
+    <group ref={body} position={[0, .8, 0]}>
+      <group position={[0, -.8, 0]}><Avatar id={id} scale={1.1} pose={pose} motion={motion} /></group>
     </group>
   </group>;
 }
 
-function PartyConfetti({ motion }: CelebrationProps) {
+function PartyConfetti({ motion, timeline }: CelebrationProps & { timeline: { current: number } }) {
   const mesh = useRef<THREE.InstancedMesh>(null), elapsed = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const pieces = useMemo(() => Array.from({ length: 120 }, (_, i) => ({
@@ -68,10 +101,12 @@ function PartyConfetti({ motion }: CelebrationProps) {
     const instance = mesh.current;
     if (!instance) return;
     pieces.forEach((piece, i) => {
-      const age = (time + 4.8 - piece.delay) % 4.8;
+      // First burst meets the shared jump; a second answers the final wave.
+      const burst = time < 23.2 ? -100 : time < 26.5 ? 23.2 : time < 30 ? 26.5 : 30 + Math.floor((time - 30) / 7) * 7;
+      const age = time - burst - piece.delay;
       if (animate) {
         const y = .6 + piece.speed * age - 2.7 * age * age;
-        const alive = age < 2.7 && y > .05;
+        const alive = age >= 0 && age < 2.7 && y > .05;
         dummy.position.set(piece.side * (3.2 - piece.spread * age), Math.max(.03, y), piece.depth * age - .5);
         dummy.scale.set(alive ? piece.size : 0, alive ? piece.size * 1.6 : 0, 1);
         dummy.rotation.set(age * 5 + piece.rotation, age * 3.7 + piece.rotation, age * 2.5);
@@ -89,9 +124,9 @@ function PartyConfetti({ motion }: CelebrationProps) {
     if (mesh.current?.instanceColor) mesh.current.instanceColor.needsUpdate = true;
     draw(elapsed.current, motion);
   }, [pieces, motion]);
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!motion) return;
-    elapsed.current += Math.min(delta, .05);
+    elapsed.current = timeline.current;
     draw(elapsed.current, true);
   });
   return <instancedMesh ref={mesh} args={[undefined, undefined, pieces.length]} frustumCulled={false}>
@@ -102,8 +137,14 @@ function PartyConfetti({ motion }: CelebrationProps) {
 
 /** Five friends celebrate together; the parent places the party at the rainbow. */
 export function Celebration({ motion }: CelebrationProps) {
-  return <group name="birthday-celebration" userData={{ actor: true }}>
-    {PARTY.map(dancer => <Dancer key={dancer.id} {...dancer} motion={motion} />)}
-    <PartyConfetti motion={motion} />
+  const timeline = useRef(0);
+  const group = useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    if (motion) timeline.current += Math.min(delta, .05);
+    if (group.current) group.current.userData.elapsed = timeline.current;
+  });
+  return <group ref={group} name="birthday-celebration" userData={{ actor: true }}>
+    {PARTY.map((dancer, index) => <Dancer key={dancer.id} {...dancer} index={index} timeline={timeline} motion={motion} />)}
+    <PartyConfetti motion={motion} timeline={timeline} />
   </group>;
 }

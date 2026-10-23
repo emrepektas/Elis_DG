@@ -19,6 +19,7 @@ export async function audit(directory) {
   const privateNames = privateStory ? [privateStory.sender, privateStory.recipient] : [];
   if (privateStory) {
     if(privateStory.welcomeTitle)markers.push(privateStory.welcomeTitle);
+    markers.push(...(privateStory.dialogue??[]).map(line=>line.text));
     markers.push(privateStory.title, ...Object.values(privateStory.stops).flatMap(stop => [stop.title, stop.hint]).filter(value => value.length > 20),
       ...privateStory.note.paragraphs.filter(p => p.length > 20), privateStory.parcel.hint,
       ...privateStory.flowers.map(flower => flower.message), ...privateStory.stickers.map(sticker => sticker.id),

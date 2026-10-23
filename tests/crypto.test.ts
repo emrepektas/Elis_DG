@@ -116,6 +116,8 @@ test('v3 story validation rejects incomplete progression, unsafe gift links, and
   for (const change of [
     { version: 1 }, { version: 2 }, { stops: {} }, { crew: [{ id: 'one', name: 'One', model: 'blue' }] },
     { avatars: [] },
+    { dialogue: [{phase:'arrival',start:4,end:2,speaker:'blue',text:'Invalid timing'}] },
+    { dialogue: [{phase:'arrival',start:0,end:2,speaker:'unknown',text:'Unknown speaker'}] },
     { avatars: syntheticStory.avatars.map(() => ({ id: 'blue', name: 'Repeated' })) },
     { avatars: syntheticStory.avatars.map(avatar => ({ ...avatar, sticker: 'missing' })) },
     { avatars: syntheticStory.avatars.map(avatar => ({ ...avatar, draft: 'Unexpected data' })) },

@@ -26,9 +26,30 @@ export const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b
 export const smooth = (p: number) => { const x = Math.min(1, Math.max(0, p)); return x * x * (3 - 2 * x); };
 export const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
 export const cinematic = (phase: Phase) => ['descent','board','haul','bedtime','night','arrival'].includes(phase);
-export const duration: Partial<Record<Phase, number>> = { descent:5.5, board: 2, haul: 1.8, bedtime: 3.5, night: 8, arrival: 4 };
+export const duration: Partial<Record<Phase, number>> = { descent:5.5, board: 2, haul: 1.8, bedtime: 5, night: 20, arrival: 12 };
 export function lightAt(phase: Phase, t: number): number {
-  if (phase === 'bedtime') return smooth(t / 3.5);
-  if (phase === 'night') return 1 - smooth((t - 4.4) / 3.6);
+  if (phase === 'bedtime') return smooth(t / 5);
+  if (phase === 'night') return 1 - smooth((t - 14) / 6);
   return 0;
+}
+
+const voyageClamp=(v:number,min:number,max:number)=>Math.min(max,Math.max(min,v));
+export const GATES = [[9,-5.3],[14,-2.6],[19,-5]] as const;
+export const ROCKS = [[7.8,-1.5],[11.5,-4],[13,-5.6],[16.7,-1.3],[18,-4],[20.6,-7]] as const;
+export interface VoyageState { x:number; z:number; velocity:number; speed:number; elapsed:number; checkpoint:number; gates:number; bump:number; cooldown:number }
+export const voyageStart=():VoyageState=>({x:5,z:-4,velocity:0,speed:.24,elapsed:0,checkpoint:0,gates:0,bump:0,cooldown:0});
+/** Soft impacts slow forward progress and push away; checkpoints never discard the route. */
+export function sailStep(v:VoyageState,keys:Set<string>,dt:number,assist:boolean):VoyageState{
+ const n={...v},t=n.elapsed+=dt;
+ n.cooldown=Math.max(0,n.cooldown-dt); n.bump=Math.max(0,n.bump-dt);
+ const target=GATES.find(g=>g[0]>n.x+.3);
+ const steer=assist?voyageClamp(((target?.[1]??-4)-n.z)*1.7,-1,1):Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft'));
+ n.velocity+=(steer*1.8+Math.sin(t*1.55)*.21-n.velocity*1.6)*dt;
+ n.z=voyageClamp(n.z+n.velocity*dt,-7.4,-.6);
+ const desired=keys.has('KeyS')?.17:keys.has('KeyW')?.285:assist?.28:.245;
+ n.speed+=(desired-n.speed)*dt*2;
+ n.x=Math.min(22,n.x+n.speed*dt);
+ if(n.cooldown===0){for(const [x,z] of ROCKS){if(Math.hypot((x-n.x)*1.3,z-n.z)<.78){n.velocity=(n.z>z?1:-1)*1.6;n.speed=.04;n.bump=.75;n.cooldown=2.2;break;}}}
+ GATES.forEach(([x,z],i)=>{if(v.x<x&&n.x>=x){n.checkpoint=i+1;if(Math.abs(n.z-z)<1.1)n.gates|=1<<i;}});
+ return n;
 }
