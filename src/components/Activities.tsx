@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Story, Vault } from '../types';
 import { AssetImg } from './AssetImg';
 
@@ -20,20 +20,27 @@ export function MatchingGame({ story, vault }: { story: Story; vault: Vault }) {
   const [round, setRound] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [matched, setMatched] = useState(false);
+  const firstChoice = useRef<HTMLButtonElement>(null);
+  const completion = useRef<HTMLParagraphElement>(null);
   const item = game.rounds[round];
   const done = round >= game.rounds.length;
+  useEffect(() => {
+    if (round === 0) return;
+    if (done) completion.current?.focus();
+    else firstChoice.current?.focus();
+  }, [round, done]);
   const choose = (owner: string) => {
     if (owner === item.owner) { setFeedback(game.correct); setMatched(true); }
     else setFeedback(game.tryAgain);
   };
   return <section className="activity matching-game" aria-label="Sticker eşleştirme">
     <p>{game.intro}</p>
-    {!done ? <><div className="matching-image"><AssetImg vault={vault} id={item.asset} alt={story.assetAlts[item.asset]} /></div>
+    {!done ? <><div className="matching-image"><AssetImg vault={vault} id={item.asset} alt={item.alt} /></div>
       <p className="round-label">{round + 1} / {game.rounds.length}</p>
-      <div className="owner-options">{[story.sender, story.recipient].map(owner => <button key={owner} disabled={matched} onClick={() => choose(owner)}>{owner}</button>)}</div>
+      <div className="owner-options">{[story.sender, story.recipient].map((owner, index) => <button ref={index === 0 ? firstChoice : undefined} key={owner} disabled={matched} onClick={() => choose(owner)}>{owner}</button>)}</div>
       <p className="activity-feedback" role="status">{feedback || 'Bu sticker kimin?'}</p>
       {matched ? <button className="text-button" onClick={() => { setRound(r => r + 1); setFeedback(''); setMatched(false); }}>{round === game.rounds.length - 1 ? 'Tamamla' : 'Sıradaki sticker'} <span aria-hidden="true">↗</span></button> : null}
-    </> : <p className="activity-done" role="status"><span aria-hidden="true">✧</span> {game.done}</p>}
+    </> : <p ref={completion} tabIndex={-1} className="activity-done" role="status"><span aria-hidden="true">✧</span> {game.done}</p>}
   </section>;
 }
 

@@ -1,8 +1,10 @@
 import { chromium } from 'playwright';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { readOriginalAsset } from './voucher-original.mjs';
+import { encryptPackage } from '../scripts/vault-lib.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const privateRoot = path.resolve(root, '../private');
@@ -56,6 +58,19 @@ try {
   await page.getByRole('button', { name: 'Sesi duraklat', exact: true }).click();
   await page.getByRole('button', { name: 'Sesi aç', exact: true }).waitFor();
 
+  // A short landscape viewport must retain its header/footer after navigation.
+  await page.setViewportSize({ width: 667, height: 375 });
+  await next(1);
+  assert.ok(await page.evaluate(() => {
+    const header = document.querySelector('.journey-header').getBoundingClientRect();
+    const footer = document.querySelector('.journey-footer').getBoundingClientRect();
+    const heading = document.querySelector('#scene-title').getBoundingClientRect();
+    return window.scrollY === 0 && header.top >= 0 && footer.bottom <= innerHeight + 1 && heading.top >= header.bottom - 1;
+  }), 'Landscape navigation moved the heading or controls outside the viewport');
+  await page.locator('.back-button').click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await sceneReady(0);
+
   for (let index = 1; index < story.scenes.length; index++) {
     await next(index);
     const scene = story.scenes[index];
@@ -67,13 +82,24 @@ try {
       const game = page.locator('.matching-game');
       for (let round = 0; round < story.activities.matching.rounds.length; round++) {
         const item = story.activities.matching.rounds[round];
+        const image = game.locator('.matching-image img');
+        await image.waitFor();
+        const alt = await image.getAttribute('alt');
+        assert.ok(alt && ![story.sender, story.recipient].some(name => alt.toLocaleLowerCase('tr').includes(name.toLocaleLowerCase('tr'))), 'Matching alt text reveals the answer');
         if (round === 0) {
           const wrong = item.owner === story.sender ? story.recipient : story.sender;
           await game.getByRole('button', { name: wrong, exact: true }).click();
           await game.getByText(story.activities.matching.tryAgain, { exact: true }).waitFor();
         }
         await game.getByRole('button', { name: item.owner, exact: true }).click();
-        await game.getByRole('button', { name: round === story.activities.matching.rounds.length - 1 ? 'Tamamla' : 'Sıradaki sticker', exact: false }).click();
+        const advance = game.getByRole('button', { name: round === story.activities.matching.rounds.length - 1 ? 'Tamamla' : 'Sıradaki sticker', exact: false });
+        await advance.focus();
+        await page.keyboard.press('Enter');
+        if (round < story.activities.matching.rounds.length - 1) {
+          await page.waitForFunction(() => document.activeElement === document.querySelector('.owner-options button'));
+        } else {
+          await page.waitForFunction(() => document.activeElement === document.querySelector('.matching-game .activity-done'));
+        }
       }
       await game.getByText(story.activities.matching.done, { exact: false }).waitFor();
       await page.screenshot({ path: path.join(output, 'desktop-scrapbook.png') });
@@ -109,7 +135,7 @@ try {
         await page.locator('.voucher a[download]').click();
         const download = await downloadPromise;
         const actual = await readFile(await download.path());
-        const expected = await readFile(path.join(privateRoot, 'assets', story.voucher.filename));
+        const expected = await readOriginalAsset(path.join(privateRoot, 'assets'), story.voucher.assetId);
         assert.deepEqual(actual, expected, 'Voucher download changed original bytes');
       }
     }
@@ -133,6 +159,39 @@ try {
   await page.reload();
   await page.getByLabel('Parola', { exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => [localStorage.length, sessionStorage.length]), [0, 0]);
+
+  // Test ready-file downloads even while the real gift is deliberately pending.
+  const fixtureDirectory = path.join(output, 'voucher-fixture');
+  await mkdir(fixtureDirectory, { recursive: true });
+  const originalName = 'synthetic-original.pdf';
+  const downloadName = 'different-download-name.pdf';
+  const originalBytes = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+  await writeFile(path.join(fixtureDirectory, originalName), originalBytes);
+  const fixturePassword = 'synthetic-voucher-test-password';
+  const fixtureStory = {
+    ...story,
+    scenes: [{ ...story.scenes.find(scene => scene.kind === 'voucher'), id: 1, stickers: [], background: 'fixture-background' }],
+    voucher: { status: 'ready', title: 'Test voucher', description: 'Synthetic browser-only fixture.', assetId: 'synthetic-original', filename: downloadName },
+  };
+  const fixture = await encryptPackage(fixtureStory, [
+    { id: 'synthetic-original', filename: originalName, mime: 'application/pdf', bytes: originalBytes },
+    { id: 'fixture-background', filename: 'background.svg', mime: 'image/svg+xml', bytes: new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><path fill="#142842" d="M0 0h8v8H0z"/></svg>') },
+  ], fixturePassword);
+  await page.route('**/locked/**', route => {
+    const filename = new URL(route.request().url()).pathname.split('/').at(-1);
+    if (filename === 'manifest.json') return route.fulfill({ contentType: 'application/json', body: JSON.stringify(fixture.manifest) });
+    const bytes = fixture.files.get(filename);
+    return bytes ? route.fulfill({ contentType: 'application/octet-stream', body: Buffer.from(bytes) }) : route.fulfill({ status: 404 });
+  });
+  await page.getByLabel('Parola', { exact: true }).fill(fixturePassword);
+  await page.getByRole('button', { name: 'Yolculuğu aç' }).click();
+  await page.getByRole('button', { name: 'Hediyeni aç' }).click();
+  await page.locator('.voucher a[download]').waitFor();
+  const fixtureDownload = page.waitForEvent('download');
+  await page.locator('.voucher a[download]').click();
+  const saved = await fixtureDownload;
+  assert.equal(saved.suggestedFilename(), downloadName);
+  assert.deepEqual(await readFile(await saved.path()), await readOriginalAsset(fixtureDirectory, fixtureStory.voucher.assetId));
   assert.deepEqual(failures, [], 'Browser errors or failed HTTP requests');
-  console.log('PASS: 15 scenes, all games, skip/back/replay, stats/focus, letter scrolling, voucher state, parcel, audio consent/disposal, refresh lock, no browser errors.');
+  console.log('PASS: 15 scenes, games and keyboard focus, neutral quiz alternatives, landscape navigation, renamed voucher exact-byte download, stats, letter, parcel, audio, refresh lock; no browser errors.');
 } finally { await browser.close(); }

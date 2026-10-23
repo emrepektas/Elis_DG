@@ -88,6 +88,7 @@ function Journey({ vault, lock }: { vault: Vault; lock: () => void }) {
     const next = story.scenes[index + 1]?.background;
     if (next) void vault.assetUrl(next).catch(() => { /* The visible asset offers retry if unavailable. */ });
     main.current?.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.getElementById('scene-title')?.focus({ preventScroll: true });
   }, [index, story, vault]);
   function navigate(next: number) { if (next >= 0 && next < story.scenes.length) setIndex(next); }

@@ -25,6 +25,10 @@ const referenced = [
   ...(story.voucher.assetId ? [story.voucher.assetId] : []),
 ];
 for (const id of referenced) if (!known.has(id)) throw new Error(`Missing referenced asset: ${id}`);
+for (const round of story.activities.matching.rounds) {
+  if (typeof round.alt !== 'string' || !round.alt.trim()) throw new Error('Matching images need neutral visual descriptions.');
+  if ([story.sender, story.recipient].some(name => round.alt.toLocaleLowerCase('tr').includes(name.toLocaleLowerCase('tr')))) throw new Error('Matching image descriptions must not reveal their owner.');
+}
 if (story.voucher.status === 'ready' && !story.voucher.assetId && !story.voucher.code && !story.voucher.redemptionUrl) throw new Error('A ready voucher needs its redeemable material.');
 if (story.voucher.redemptionUrl && !/^https:\/\//.test(story.voucher.redemptionUrl)) throw new Error('Voucher links must use HTTPS.');
 const passwordPath = path.join(privateRoot, 'access.txt');

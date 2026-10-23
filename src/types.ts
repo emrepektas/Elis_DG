@@ -7,7 +7,7 @@ export interface Story {
   scenes: Scene[]; letter: string[]; assetAlts: Record<string, string>;
   activities: {
     penguin: { intro: string; steps: string[]; done: string };
-    matching: { intro: string; rounds: { asset: string; owner: string }[]; correct: string; tryAgain: string; done: string };
+    matching: { intro: string; rounds: { asset: string; owner: string; alt: string }[]; correct: string; tryAgain: string; done: string };
     flowers: { intro: string; items: { label: string; message: string }[]; done: string };
   };
   stats: { title: string; period: string; items: { value: string; label: string }[]; footnote: string };
