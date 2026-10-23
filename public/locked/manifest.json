@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "kdf": {
+    "name": "PBKDF2",
+    "hash": "SHA-256",
+    "iterations": 600000,
+    "salt": "Ge6iHnJqZqBrGiqojwYYaQ=="
+  },
+  "payload": {
+    "path": "a394772df6fe6856e83bb37ac45a0a6b.bin",
+    "iv": "z01R07N6phvqsV6I"
+  }
+}
