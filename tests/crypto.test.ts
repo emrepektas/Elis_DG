@@ -3,10 +3,24 @@ import assert from 'node:assert/strict';
 // @ts-expect-error The packager is an executable native JavaScript module.
 import { encryptPackage, ITERATIONS } from '../scripts/vault-lib.mjs';
 import { unlock } from '../src/crypto.ts';
+import { referencedAssets, validateStory } from '../src/story-schema.ts';
+import type { Story } from '../src/types.ts';
 
 const password = 'synthetic-test-password-not-a-real-secret';
 const exactBytes = Uint8Array.from([0, 1, 2, 255, 195, 177, 0, 27, 128]);
-const fixture = await encryptPackage({ title: 'Synthetic fixture', scenes: [] }, [{ id: 'fixture', mime: 'application/pdf', filename: 'original.pdf', bytes: exactBytes }], password);
+const syntheticStory: Story = {
+  version: 2, title: 'Synthetic fixture', sender: 'Sender', recipient: 'Recipient',
+  stops: Object.fromEntries(['coast', 'crew', 'penguin', 'sailing', 'fishing', 'notebook', 'garden', 'gifts'].map(id => [id, { title: 'Stop', hint: 'Hint', action: 'Continue' }])) as Story['stops'],
+  crew: [{ id: 'one', name: 'One', model: 'blue' }, { id: 'two', name: 'Two', model: 'stone' }],
+  stickers: [{ id: 'sticker', alt: 'Generic illustrated figure', owner: 'Sender' }],
+  notebook: Array.from({ length: 3 }, () => ({ title: 'Page', text: '', stickers: ['sticker'] })),
+  flowers: Array.from({ length: 3 }, () => ({ label: 'Flower', message: 'Message' })), motifs: [],
+  note: { status: 'pending', paragraphs: [] },
+  voucher: { status: 'ready', title: 'Gift', description: 'Synthetic gift', assetId: 'fixture', filename: 'download.pdf' },
+  parcel: { hint: 'Hint', note: 'Note' },
+};
+const fixtureAssets = [{ id: 'fixture', mime: 'application/pdf', filename: 'original.pdf', bytes: exactBytes }, { id: 'sticker', mime: 'image/png', filename: 'image.png', bytes: exactBytes }];
+const fixture = await encryptPackage(syntheticStory, fixtureAssets, password);
 const originalFetch = globalThis.fetch;
 function serve(manifest = fixture.manifest, alter?: (bytes: Uint8Array) => Uint8Array) {
   const requests: string[] = [];
@@ -86,9 +100,38 @@ test('package metadata and opaque filenames disclose no private text or filename
     assert.match(filename, /^[a-f0-9]{32}\.bin$/);
     assert.ok(!new TextDecoder().decode(bytes).includes('Synthetic fixture'));
   }
-  const other = await encryptPackage({ title: 'Synthetic fixture', scenes: [] }, [], password);
+  const other = await encryptPackage(syntheticStory, [], password);
   assert.notEqual(other.manifest.kdf.salt, fixture.manifest.kdf.salt);
   assert.notEqual(other.manifest.payload.iv, fixture.manifest.payload.iv);
+});
+
+test('v2 story validation rejects incomplete progression, unsafe gift links, and hidden legacy content', () => {
+  validateStory(syntheticStory);
+  assert.deepEqual(referencedAssets(syntheticStory), ['sticker', 'fixture']);
+  for (const change of [
+    { version: 1 }, { stops: {} }, { crew: [{ id: 'one', name: 'One', model: 'blue' }] },
+    { stickers: [{ id: 'sticker', alt: 'Figure', owner: 'Unknown' }] },
+    { notebook: Array.from({ length: 3 }, () => ({ title: 'Page', text: '', stickers: ['missing'] })) },
+    { note: { status: 'pending', paragraphs: ['Unapproved draft'] } },
+    { voucher: { status: 'ready', title: 'Gift', description: 'Gift', redemptionUrl: 'javascript:alert(1)' } },
+    { voucher: { status: 'ready', title: 'Gift', description: 'Gift', redemptionUrl: 'https://user:pass@example.com/' } },
+    { scenes: [] },
+  ]) assert.throws(() => validateStory({ ...syntheticStory, ...change }));
+});
+
+test('authenticated but invalid content and missing referenced assets never produce a vault', async () => {
+  for (const malformed of [
+    await encryptPackage({ ...syntheticStory, version: 1 }, fixtureAssets, password),
+    await encryptPackage(syntheticStory, fixtureAssets.slice(0, 1), password),
+  ]) {
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).endsWith('manifest.json')) return Response.json(malformed.manifest);
+      const bytes = malformed.files.get(String(url).split('/').at(-1));
+      return bytes ? new Response(bytes.slice().buffer as ArrayBuffer) : new Response(null, { status: 404 });
+    }) as typeof fetch;
+    try { await assert.rejects(unlock(password, '/test/')); }
+    finally { globalThis.fetch = originalFetch; }
+  }
 });
 
 test('unknown IDs do not fetch arbitrary files', async () => {

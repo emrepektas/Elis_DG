@@ -1,4 +1,5 @@
 import type { AssetData, Story, Vault } from './types';
+import { referencedAssets, validateStory } from './story-schema.ts';
 
 const ITERATIONS = 600_000;
 const opaquePath = /^[a-f0-9]{32}\.bin$/;
@@ -39,11 +40,14 @@ export async function unlock(password: string, baseUrl = import.meta.env?.BASE_U
     return new Uint8Array(decrypted);
   }
   const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await decrypt(manifest.payload))) as { story: Story; assetMap: Record<string, Entry> };
-  if (!payload.story || !Array.isArray(payload.story.scenes) || !payload.assetMap || typeof payload.assetMap !== 'object') throw new Error('Eksik yolculuk paketi.');
+  validateStory(payload.story);
+  if (!payload.assetMap || typeof payload.assetMap !== 'object' || Array.isArray(payload.assetMap)) throw new Error('Eksik yolculuk paketi.');
   for (const entry of Object.values(payload.assetMap)) {
+    if (!entry || typeof entry !== 'object') throw new Error('Geçersiz dosya bilgisi.');
     checkPath(entry.path); from64(entry.iv, 12);
-    if (typeof entry.mime !== 'string' || typeof entry.filename !== 'string' || /[\\/\r\n]/.test(entry.filename)) throw new Error('Geçersiz dosya bilgisi.');
+    if (typeof entry.mime !== 'string' || !/^[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+$/.test(entry.mime) || typeof entry.filename !== 'string' || !entry.filename || entry.filename.length > 240 || /[\\/\r\n]/.test(entry.filename)) throw new Error('Geçersiz dosya bilgisi.');
   }
+  for (const id of referencedAssets(payload.story)) if (!Object.hasOwn(payload.assetMap, id)) throw new Error('Eksik yolculuk dosyası.');
   const bytesCache = new Map<string, Promise<AssetData>>();
   const urlCache = new Map<string, Promise<string>>();
   const urls = new Set<string>();

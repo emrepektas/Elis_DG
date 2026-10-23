@@ -8,19 +8,23 @@
     "pack:private": "node scripts/pack-private.mjs",
     "test": "node --experimental-strip-types --test --test-isolation=none tests/*.test.ts",
     "test:e2e": "node e2e/browser-check.mjs",
+    "test:motion": "node e2e/motion-check.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build && node scripts/audit.mjs dist",
     "preview": "vite preview --host 127.0.0.1",
     "audit": "node scripts/audit.mjs dist"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.0.4",
     "playwright": "^1.64.1",
     "typescript": "~5.9.3",
