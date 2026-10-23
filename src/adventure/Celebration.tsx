@@ -60,16 +60,36 @@ function Dancer({ id, x, z, phase, motion, timeline, index }: typeof PARTY[numbe
         hop = Math.max(0, Math.sin(beat + phase)) * .035;
       }
     } else if (t < 26) {
-      nextPose = 'cheer';
-      const jump = (t - 23) / 1.1;
+      // The careful organiser gives the cue, then everyone follows.
+      nextPose = id === 'stone' && t < 22.7 ? 'point' : 'cheer';
+      const jumpStart = id === 'stone' ? 22.7 : 23;
+      const jump = (t - jumpStart) / 1.1;
       if (jump > 0 && jump < 1) hop = Math.sin(jump * Math.PI) * .9;
-      if (t < 23) lean = -.12 * Math.sin((t - 22) * Math.PI);
+      if (t < jumpStart) lean = -.12 * Math.sin((t - 22) / (jumpStart - 22) * Math.PI);
     } else if (t < 30) {
       nextPose = 'wave'; spin = Math.sin(t * 1.5 + phase) * .1;
     } else {
       nextPose = Math.floor((t - 30) / 4) % 3 === 2 ? 'clap' : 'dance';
       hop = Math.max(0, Math.sin(beat + phase)) * (id === 'penguin' ? .24 : .1);
       spin = Math.sin(t * 1.2 + phase) * .22;
+    }
+    // Pay off the crew's travelling habits before their individual solos.
+    if (id === 'penguin' && t < 11) {
+      nextPose = 'sleep'; hop = 0; spin = 0;
+      lean = -.13 + Math.sin(t * 1.2) * .045;
+    } else if (id === 'penguin' && t < 13) {
+      nextPose = 'cheer';
+      hop = Math.max(0, Math.sin(beat)) * .16;
+      lean = Math.sin(beat * .5) * .1;
+    }
+    if (id === 'penguin' && isSolo) {
+      nextPose = 'cheer';
+      forward *= 1.2;
+      lean = Math.sin(beat) * .15;
+    }
+    if (id === 'capybara' && t < 7) {
+      nextPose = t < 5.4 ? 'idle' : 'clap';
+      hop = 0; lean = t < 5.4 ? 0 : Math.sin(beat * .5) * .035;
     }
     if (!motion) nextPose = 'cheer';
     if (nextPose !== currentPose.current) { currentPose.current = nextPose; setPose(nextPose); }

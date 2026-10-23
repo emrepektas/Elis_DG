@@ -15,7 +15,7 @@ function Sheet({title,children,onClose,className='',hideTitle=false}:{title:stri
 }
 const emptyStatus:Status={action:'',fish:'idle',reel:0,progress:0,night:0,x:-7,z:6,yaw:0,time:0};
 const actionLabels:Record<string,string>={board:'Tekneye bin',cast:'Oltayı at',reel:'Basılı tut: oltayı sar',book:'Defteri aç',gift:'Sandığı aç','keys-needed':'Sandık için üç anahtarı bul'};
-const phaseLabel:Partial<Record<Phase,string>>={board:'Açılıyoruz',haul:'Bir defter!',bedtime:'İyi geceler',arrival:'Günaydın'};
+const phaseLabel:Partial<Record<Phase,string>>={board:'Açılıyoruz',haul:'Kurtardık!',overboard:'Defter denizde!',treasure:'',bedtime:'İyi geceler',arrival:'Günaydın'};
 export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  const{story}=vault;
  const[phase,setPhase]=useState<Phase>('welcome'),[avatar,setAvatar]=useState<AvatarId>('blue'),[flowers,setFlowers]=useState<number[]>([]);
@@ -27,7 +27,7 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  const audio=useRef<JourneyAudio|undefined>(undefined),input=useRef<Input>({keys:new Set(),yaw:0,pitch:.05,press:0});
  const root=useRef<HTMLDivElement>(null),hadCapture=useRef(false);
  const panels=journal||gift||collection||menu;
- const spokenIndex=panels?-1:(story.dialogue??[]).findIndex((line,index)=>line.phase===phase&&!readLines.includes(index));
+ const spokenIndex=panels?-1:(story.dialogue??[]).findIndex((line,index)=>line.phase===phase&&!readLines.includes(index)&&(phase!=='sail'||(status.phase===phase&&status.time>=line.start))&&(!line.trigger||(flowers.length===3&&(line.trigger==='keys-complete'||Math.hypot(status.x-GIFT[0],status.z-GIFT[1])<6))));
  const spoken=spokenIndex<0?undefined:story.dialogue?.[spokenIndex];
  const modal=panels||!!spoken;
  const controllable=['coast','sail','fish','garden','notebook'].includes(phase);
@@ -49,17 +49,20 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  function advanceDialogue(){audio.current?.cue('page');setReadLines(old=>[...old,spokenIndex]);if(controllable&&!assist)recapture()}
  function recapture(){(document.querySelector('dialog[open]') as HTMLDialogElement|null)?.close();void root.current?.querySelector('canvas')?.requestPointerLock?.()?.catch?.(()=>{})}
  async function capture(){if(modal||cinematic(phase)||failed)return;try{const canvas=root.current?.querySelector('canvas');if(!canvas?.requestPointerLock)throw Error();await canvas.requestPointerLock();setLockError('')}catch{setLockError('Fare kontrolü açılamadı. Menüden rehberi açabilirsin.')}}
- function interact(action:string){if(action==='board')setPhase('board');if(action==='book')setJournal(true);if(action==='gift'&&flowers.length===3){setPhase('gifts');setGift(true)}const match=/^key-(\d)$/.exec(action);if(match){const index=Number(match[1]);if(!flowers.includes(index)){setFlowers(old=>old.includes(index)?old:[...old,index]);setKeyToast(flowers.length===2?'Üç anahtar tamam! Gökkuşağının altındaki sandığa dön.':`Anahtar bulundu! ${flowers.length+1} / 3`);if(sound)audio.current?.cue(flowers.length===2?'unlock':'key')}}}
+ function interact(action:string){if(action==='board')setPhase('board');if(action==='book')setJournal(true);if(action==='gift'&&flowers.length===3){setPhase('treasure')}const match=/^key-(\d)$/.exec(action);if(match){const index=Number(match[1]);if(!flowers.includes(index)){setFlowers(old=>old.includes(index)?old:[...old,index]);setKeyToast(flowers.length===2?'Üç anahtar tamam! Gökkuşağının altındaki sandığa dön.':`Anahtar bulundu! ${flowers.length+1} / 3`);if(sound)audio.current?.cue(flowers.length===2?'unlock':'key')}}}
 
  async function toggleAudio(){try{audio.current??=new JourneyAudio();if(sound)await audio.current.pause();else await audio.current.play();setSound(s=>!s);setAudioError('')}catch{setAudioError('Ses açılamadı. Yolculuğa devam edebilirsin.')}}
  async function begin(withSound:boolean){if(withSound!==sound)await toggleAudio();setPhase('descent')}
  function replay(){document.exitPointerLock?.();setFlowers([]);setReadLines([]);setPage(0);setJournal(false);setKeyToast('');setGift(false);setCollection(false);setMenu(false);setAssist(false);setGiftStep(0);setStatus(emptyStatus);setPhase('welcome');input.current={keys:new Set(),yaw:0,pitch:.05,press:0}}
  function closeMenu(){setMenu(false);if(controllable&&!assist)recapture()}
- function fallbackNext(){const next:Partial<Record<Phase,Phase>>={descent:'choose',coast:'board',board:'sail',sail:'fish',fish:'haul',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};if(next[phase])setPhase(next[phase]!)}
+ function fallbackNext(){const next:Partial<Record<Phase,Phase>>={descent:'choose',coast:'board',board:'sail',sail:'overboard',overboard:'fish',fish:'haul',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden',treasure:'gifts'};if(next[phase])setPhase(next[phase]!)}
  useEffect(()=>{if(failed&&cinematic(phase)&&!modal){const timer=setTimeout(()=>fallbackNext(),500);return()=>clearTimeout(timer)}},[failed,phase,modal]);
+ const effectBeats=useRef(new Set<string>());
+ useEffect(()=>{effectBeats.current.clear()},[phase]);
+ useEffect(()=>{if(!sound||hidden||status.phase!==phase)return;const cues:([number,string,string])[]=phase==='treasure'?[[1.8,'key',avatar],[4.1,'key',avatar],[6.4,'key',avatar],[7.4,'unlock',avatar],[8.8,'confetti',avatar]]:phase==='bedtime'?[[2.8,'snore','penguin']]:[];for(const [at,cue,who]of cues){const key=phase+at;if(status.time>=at&&!effectBeats.current.has(key)){effectBeats.current.add(key);audio.current?.cue(cue,who)}}},[phase,status.phase,status.time,sound,hidden,avatar]);
  const lastCue=useRef('');
  useEffect(()=>{audio.current?.setMood(phase==='celebration'?'party':['night','bedtime'].includes(phase)?'night':'day');if(sound){const key=spoken?phase+spoken.start:'';if(key&&key!==lastCue.current)audio.current?.cue(spoken!.cue??'babble',spoken!.speaker);lastCue.current=key}},[phase,spoken,sound]);
- useEffect(()=>{if(sound)audio.current?.cue(phase==='celebration'?'confetti':phase==='haul'?'reel':phase==='notebook'?'page':phase==='descent'?'whoosh':phase==='board'?'boat':phase==='arrival'?'land':phase==='gifts'?'chest':'',avatar)},[phase,sound]);
+ useEffect(()=>{if(sound)audio.current?.cue(phase==='celebration'?'confetti':phase==='overboard'?'splash':phase==='haul'?'reel':phase==='notebook'?'page':phase==='descent'?'whoosh':phase==='board'?'boat':phase==='arrival'?'land':phase==='gifts'?'chest':'',avatar)},[phase,sound]);
  useEffect(()=>{if(keyToast){const timer=setTimeout(()=>setKeyToast(''),4000);return()=>clearTimeout(timer)}},[keyToast]);
  useEffect(()=>{if(status.voyageEvent)audio.current?.cue(status.voyageEvent==='bump'?'splash':'bell')},[status.voyageEvent,status.checkpoint]);
  const currentPage=story.notebook[page],action=status.action,picked=/^key-(\d)$/.exec(action);
@@ -69,7 +72,7 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  function finishGift(){setGift(false);setPhase('celebration')}
  return <div ref={root} className={`adventure ${cinematic(phase)||spoken?'in-cinema':''} ${reduced?'reduce-motion':''}`} data-phase={phase} data-avatar={avatar} data-keys={flowers.length} data-dialogue={spoken?spokenIndex:undefined}>
   <div className="adventure-world" onClick={()=>{if(['welcome','descent','choose','celebration'].includes(phase))return;if(locked)input.current.press++;else void capture()}}>
-   {!failed?<Boundary failed={()=>setFailed(true)}><Suspense fallback={<p className="world-loading">Dünya hazırlanıyor…</p>}><World phase={phase} avatar={avatar} story={story} flowers={flowers} input={input} blocked={blocked} motion={!reduced&&!hidden} reduced={reduced} skip={skip} assist={assist} onPhase={setPhase} onAvatar={setAvatar} onStatus={setStatus} onInteract={interact} onFailure={()=>setFailed(true)} dialogueSpeaker={spoken?.speaker}/></Suspense></Boundary>:<div className="adventure-fallback"/>}
+   {!failed?<Boundary failed={()=>setFailed(true)}><Suspense fallback={<p className="world-loading">Dünya hazırlanıyor…</p>}><World phase={phase} avatar={avatar} story={story} flowers={flowers} input={input} blocked={blocked} motion={!reduced&&!hidden} reduced={reduced} skip={skip} assist={assist} onPhase={setPhase} onAvatar={setAvatar} onStatus={setStatus} onInteract={interact} onFailure={()=>setFailed(true)} dialogueSpeaker={spoken?.speaker} dialogueGesture={spoken?.gesture}/></Suspense></Boundary>:<div className="adventure-fallback"/>}
   </div>
   {!['welcome','choose','descent'].includes(phase)&&<header className="journey-header clean-header"><button className="menu-button" aria-label="Oyun menüsü" onClick={()=>setMenu(true)}>☰ <span>Menü</span></button></header>}
   {spoken&&<aside className="crew-dialogue dialogue-cinematic" aria-live="polite"><strong>{story.avatars.find(person=>person.id===spoken.speaker)?.name}</strong><p>{spoken.text}</p><button className="primary-button" onClick={advanceDialogue}>Devam et <span aria-hidden="true">→</span></button><small>E veya Boşluk</small></aside>}
@@ -81,7 +84,7 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
   {phase==='garden'&&!modal&&<div className="key-counter" key={flowers.length} aria-label={`${flowers.length} / 3 anahtar bulundu`}><div className="key-inventory">{[0,1,2].map(i=><svg key={i} viewBox="0 0 40 52" className={flowers.includes(i)?'collected':''} aria-hidden="true"><circle cx="20" cy="14" r="9"/><path d="M20 23V46M20 34H29M20 42H26"/></svg>)}</div><div><strong>Anahtarların</strong><small>{flowers.length} / 3 · {flowers.length===3?'Sandık açılabilir':'Sandık kilitli'}</small></div></div>}
   {keyToast&&<p className="key-toast" role="status">{keyToast}</p>}
   {phase==='sail'&&<div className="boat-instructions"><span>Biraz açılalım.</span><small>W / S · Hız &nbsp; A / D · Dümen · Şamandıraları takip et</small></div>}
-  {action&&locked&&!modal&&<div className="interact-prompt"><kbd>E</kbd><span>{picked?'Anahtarı al':action==='keys-needed'?`Sandık kilitli · ${3-flowers.length} anahtar daha bul`:actionLabels[action]}</span>{action==='reel'&&<div className="reel-track"><span style={{width:`${status.reel*100}%`}}/></div>}</div>}
+  {action&&locked&&!modal&&<div className="interact-prompt"><kbd>E</kbd><span>{picked?['Taşı kaldır · Anahtarı al','Kurdeleden anahtarı al','Sineklere yaklaş · Anahtarı al'][Number(picked[1])]:action==='keys-needed'?`Sandık kilitli · ${3-flowers.length} anahtar daha bul`:actionLabels[action]}</span>{action==='reel'&&<div className="reel-track"><span style={{width:`${status.reel*100}%`}}/></div>}</div>}
   {phase==='fish'&&status.fish==='waiting'&&<div className="interact-prompt waiting"><span>Bir şey takıldı.</span></div>}
   {cinematic(phase)&&!spoken&&<>{phase!=='descent'&&<div className={`cinema-title cinema-${phase}`}><p>{phase==='night'?story.motifs[status.night>.5?0:1]:phaseLabel[phase]}</p></div>}<button className="cinema-skip" onClick={()=>setSkip(s=>s+1)}>Geç</button></>}
   {phase==='celebration'&&!gift&&<section className="celebration-screen"><h1>{story.title}</h1><p>— {story.sender}</p><button className="primary-button" onClick={()=>{setGiftStep(0);setGift(true)}}>Hediyeni yeniden aç</button></section>}

@@ -5,7 +5,7 @@ export interface Story {
   avatars: { id: 'blue' | 'stone' | 'penguin' | 'capybara' | 'child'; name: string; sticker?: string }[];
   title: string; recipient: string; sender: string;
   welcomeTitle?: string;
-  dialogue?: {phase:string;start:number;end:number;speaker: 'blue' | 'stone' | 'penguin' | 'capybara' | 'child';text:string;cue?:string}[];
+  dialogue?: {phase:string;start:number;end:number;speaker: 'blue' | 'stone' | 'penguin' | 'capybara' | 'child';text:string;cue?:string;trigger?:'keys-complete'|'chest';gesture?:'point'|'laugh'|'reach'|'book'|'sleep'|'wave'}[];
   stops: Record<Stop, { title: string; hint: string; action: string }>;
   crew: { id: string; name: string; model: 'blue' | 'stone' }[];
   stickers: { id: string; alt: string; owner: string }[];

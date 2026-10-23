@@ -115,7 +115,8 @@ export class JourneyAudio {
     const ctx = this.context;
     if (!this.enabled || !ctx || ctx.state !== 'running') return;
     const now = ctx.currentTime;
-    if (kind === 'babble' || kind === 'talk' || kind === 'laugh' || kind === 'yawn') {
+    if(kind==='snore'){this.rustle(now,.65,.25,180);this.tone(105,now,.7,.08,'sine',75);this.tone(80,now+.9,.45,.06,'sine',115);}
+    else if (kind === 'babble' || kind === 'talk' || kind === 'laugh' || kind === 'yawn') {
       const voices: Record<string, [number, OscillatorType]> = {
         blue: [340, 'sine'], stone: [185, 'triangle'], penguin: [530, 'sine'],
         capybara: [135, 'triangle'], child: [430, 'sine'],
