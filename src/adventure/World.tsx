@@ -8,7 +8,7 @@ import { HiddenKey, RainbowChest } from './Keys';
 import { Celebration } from './Celebration';
 import { FruitFlies, VoyageMarkers, voyageStart, sailStep } from './Voyage';
 import { Boat, Book, Ball, Box, Flower, Pole } from '../world/models';
-import { FLOWERS, GIFT, canOpenChest, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
+import { FLOWERS, GIFT, VOYAGE_END, canOpenChest, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
 
 export interface Input { keys: Set<string>; yaw: number; pitch: number; press: number }
 export interface Status { action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number; checkpoint?:number; gates?:number; voyageEvent?:string }
@@ -85,7 +85,7 @@ function Engine(p: GameProps) {
       voyage.current=sailStep(voyage.current,keys,dt,p.assist);
       boatPosition.current.set(voyage.current.x,.1,voyage.current.z);
       if(voyage.current.bump>0)action='wave-bump';
-      if(boatPosition.current.x>=22&&!done.current){done.current=true;p.onPhase('fish');}
+      if(boatPosition.current.x>=VOYAGE_END&&!done.current){done.current=true;p.onPhase('fish');}
     }
     if(phase==='fish'){
       action=fish.current==='idle'?'cast':fish.current==='bite'?'reel':'';
@@ -98,7 +98,7 @@ function Engine(p: GameProps) {
     if(phase==='notebook'){action='book';if(pressed)p.onInteract('book');}
     const dark=lightAt(phase,t);
     sleep.current=phase==='bedtime'?smooth(t/5):phase==='night'?1-smooth((t-16)/4):0;
-    if(phase==='night') boatPosition.current.set(lerp(22,218,smooth(t/20)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
+    if(phase==='night') boatPosition.current.set(lerp(VOYAGE_END,218,smooth(t/20)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
     if(phase==='arrival'){
       boatPosition.current.set(218,.1,-4);
       const q=smooth((t-8)/4);walker.current.x=lerp(218.5,223,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
@@ -125,13 +125,13 @@ function Engine(p: GameProps) {
     if(book.current){
       book.current.visible=['coast','board','sail','fish','haul','notebook','bedtime','night','arrival','garden','gifts'].includes(phase);
       let x=-1,y=.83,z=-.12;
-      if(phase==='sail'&&t>Math.max(56,voyage.current.elapsed-1)&&boatPosition.current.x>21.5){const q=clamp((boatPosition.current.x-21.5)/.5,0,1);x=lerp(-1,2.6,q);y=lerp(.83,-.2,q)+Math.sin(q*Math.PI)*.65;z=lerp(-.12,2,q);}
+      if(phase==='sail'&&boatPosition.current.x>VOYAGE_END-3){const q=clamp((boatPosition.current.x-(VOYAGE_END-3))/3,0,1);x=lerp(-1,2.6,q);y=lerp(.83,-.2,q)+Math.sin(q*Math.PI)*.65;z=lerp(-.12,2,q);}
       if(phase==='fish'){x=2.6;y=-.1+Math.sin(t*2)*.05;z=2;}
       if(phase==='haul'){const q=smooth(t/1.8);x=lerp(2.6,-1,q);y=lerp(-.1,.83,q)+Math.sin(q*Math.PI)*1.8;z=lerp(2,-.12,q);}
       book.current.position.set(boatPosition.current.x+x,boatPosition.current.y+y,boatPosition.current.z+z);
       book.current.rotation.z=phase==='fish'?-.12:0;book.current.scale.setScalar(.55);
     }
-    if(wake.current){wake.current.visible=['sail','night'].includes(phase);wake.current.position.copy(boatPosition.current);wake.current.children.forEach((object,i)=>{const q=((t*.55+i/10)%1);object.position.set(-.7-q*3,-.13,Math.sin(i*12)*(.4+q*.6));object.scale.set(.2+q*.5,.025,.06+q*.08);const m=(object as THREE.Mesh).material as THREE.MeshBasicMaterial;m.opacity=(1-q)*.7;});}
+    if(wake.current){wake.current.visible=['sail','night'].includes(phase);wake.current.position.copy(boatPosition.current);wake.current.children.forEach((object,i)=>{const q=((t*.55+i/10)%1);object.position.set(-.7-q*7,-.13,Math.sin(i*12)*(.4+q*.6));object.scale.set(.2+q*.5,.025,.06+q*.08);const m=(object as THREE.Mesh).material as THREE.MeshBasicMaterial;m.opacity=(1-q)*.7;});}
     // Camera mode changes follow a continuous position/target blend instead of replacing the world.
     const land=['coast','garden','gifts'].includes(phase),selected=phase==='choose';
     let target=new THREE.Vector3(walker.current.x,walker.current.y+1,walker.current.z),desired=new THREE.Vector3();
@@ -146,6 +146,7 @@ function Engine(p: GameProps) {
     else{
       target.copy(boatPosition.current).add(new THREE.Vector3(.3,1,0));
       let yaw=p.input.current.yaw,range=7.5,height=3.5;
+      if(phase==='sail'){range=10;height=4.2;}
       if(phase==='sail')yaw-=Math.atan2(voyage.current.velocity,Math.max(.1,voyage.current.speed))*.35;
       if(phase==='board'){const q=smooth(t/2);target.lerp(new THREE.Vector3(walker.current.x,.8,walker.current.z),1-q);yaw=lerp(0,-.9,q);}
       if(phase==='haul'||phase==='notebook'){range=5.8;height=3;}
@@ -188,7 +189,7 @@ function Engine(p: GameProps) {
     if(moving!==walking)setWalking(moving);
     report.current+=rawDelta;
     if(report.current>.1){report.current=0;if(Math.abs(night-dark)>.015)setNight(dark);
-      p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/17,0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
+      p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/(VOYAGE_END-5),0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
       Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),boatZ:String(boatPosition.current.z),checkpoint:String(voyage.current.checkpoint),gates:String(voyage.current.gates),night:String(dark),keys:String(p.flowers.length),bouquet:"0",cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
     }
   });

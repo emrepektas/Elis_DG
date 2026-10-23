@@ -10,7 +10,7 @@ export function VoyageMarkers({active,motion,progress}:{active:boolean;motion:bo
  return <group visible={active}>
  <group ref={buoys}>{GATES.flatMap(([x,z],i)=>[-1,1].map(side=><group key={`${i}-${side}`} position={[x,0,z+side*1.6]}><Ball at={[0,.08,0]} scale={[.2,.28,.2]} color={side<0?'#f48776':'#8ad6b1'}/><Pole from={[0,.2,0]} to={[0,1,0]} color="#fff2d5" radius={.025}/><mesh position={[0,.88,0]}><sphereGeometry args={[.12,10,6]}/><meshStandardMaterial color="#ffe7a4" emissive="#e7bf57" emissiveIntensity={.4}/></mesh></group>))}</group>
  {ROCKS.map(([x,z],i)=><group key={i} position={[x,-.03,z]}><mesh scale={[.48,.35,.55]}><dodecahedronGeometry args={[1,0]}/><meshStandardMaterial color="#849c9a" roughness={1}/></mesh><mesh rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.65,.71,28]}/><meshBasicMaterial color="#edffeb" transparent opacity={.6} side={THREE.DoubleSide}/></mesh></group>)}
- <group ref={waves}>{Array.from({length:9},(_,i)=><mesh key={i} position={[6+i*1.8,0,-4]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[.075,6]}/><meshBasicMaterial color="#e1fff2" transparent opacity={.25} side={THREE.DoubleSide}/></mesh>)}</group>
+ <group ref={waves}>{Array.from({length:9},(_,i)=><mesh key={i} position={[11+i*10,0,-4]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[.075,6]}/><meshBasicMaterial color="#e1fff2" transparent opacity={.25} side={THREE.DoubleSide}/></mesh>)}</group>
  </group>;
 }
 export function FruitFlies({motion}:{motion:boolean}){

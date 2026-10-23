@@ -19,8 +19,8 @@ const random = (seed: number) => {
 };
 
 // One shared timeline keeps all five figures, solos and confetti on the beat.
-// 0–3 entrance; 3–7 shared claps; 7–22 five solos; 22–26 jump;
-// 26–30 a wave to the audience, followed by a relaxed group loop.
+// 0-3 entrance; 3-7 shared claps; 7-22 five solos; 22-26 jump;
+// 26-30 a wave to the audience, followed by a relaxed group loop.
 function Dancer({ id, x, z, phase, motion, timeline, index }: typeof PARTY[number] & CelebrationProps & {
   timeline: { current: number }; index: number;
 }) {
@@ -87,23 +87,23 @@ function Dancer({ id, x, z, phase, motion, timeline, index }: typeof PARTY[numbe
 function PartyConfetti({ motion, timeline }: CelebrationProps & { timeline: { current: number } }) {
   const mesh = useRef<THREE.InstancedMesh>(null), elapsed = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const pieces = useMemo(() => Array.from({ length: 120 }, (_, i) => ({
+  const pieces = useMemo(() => Array.from({ length: 240 }, (_, i) => ({
     side: i % 2 ? 1 : -1,
     delay: random(i + 10) * .5,
     speed: 4.5 + random(i + 30) * 1.8,
     spread: .6 + random(i + 50) * 1.5,
     depth: (random(i + 70) - .5) * 2.6,
     rotation: random(i + 90) * Math.PI * 2,
-    size: .065 + random(i + 110) * .055,
+    size: .095 + random(i + 110) * .065,
     color: COLORS[i % COLORS.length],
   })), []);
   const draw = (time: number, animate: boolean) => {
     const instance = mesh.current;
     if (!instance) return;
     pieces.forEach((piece, i) => {
-      // First burst meets the shared jump; a second answers the final wave.
-      const burst = time < 23.2 ? -100 : time < 26.5 ? 23.2 : time < 30 ? 26.5 : 30 + Math.floor((time - 30) / 7) * 7;
-      const age = time - burst - piece.delay;
+      // Continuous confetti starts immediately; extra bursts mark the jump and wave.
+      const burst = time < 23.2 ? Math.floor(time / 3.2) * 3.2 : time < 26.5 ? 23.2 : time < 30 ? 26.5 : 30 + Math.floor((time - 30) / 7) * 7;
+      const age = i < 160 ? (time + 1 + piece.delay) % 2.6 : time - burst - piece.delay;
       if (animate) {
         const y = .6 + piece.speed * age - 2.7 * age * age;
         const alive = age >= 0 && age < 2.7 && y > .05;
@@ -131,7 +131,7 @@ function PartyConfetti({ motion, timeline }: CelebrationProps & { timeline: { cu
   });
   return <instancedMesh ref={mesh} args={[undefined, undefined, pieces.length]} frustumCulled={false}>
     <planeGeometry args={[1, 1]} />
-    <meshStandardMaterial side={THREE.DoubleSide} roughness={.7} emissive="#fff0c6" emissiveIntensity={.13} />
+    <meshBasicMaterial side={THREE.DoubleSide} />
   </instancedMesh>;
 }
 
@@ -143,8 +143,9 @@ export function Celebration({ motion }: CelebrationProps) {
     if (motion) timeline.current += Math.min(delta, .05);
     if (group.current) group.current.userData.elapsed = timeline.current;
   });
-  return <group ref={group} name="birthday-celebration" userData={{ actor: true }}>
+  return <group ref={group} name="birthday-celebration" scale={1.3} userData={{ actor: true }}>
     {PARTY.map((dancer, index) => <Dancer key={dancer.id} {...dancer} index={index} timeline={timeline} motion={motion} />)}
     <PartyConfetti motion={motion} timeline={timeline} />
   </group>;
 }
+

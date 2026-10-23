@@ -36,10 +36,11 @@ export function lightAt(phase: Phase, t: number): number {
 }
 
 const voyageClamp=(v:number,min:number,max:number)=>Math.min(max,Math.max(min,v));
-export const GATES = [[9,-5.3],[14,-2.6],[19,-5]] as const;
-export const ROCKS = [[7.8,-1.5],[11.5,-4],[13,-5.6],[16.7,-1.3],[18,-4],[20.6,-7]] as const;
+export const VOYAGE_START=5, VOYAGE_SCALE=6, VOYAGE_END=107;
+export const GATES = [[29,-5.3],[59,-2.6],[89,-5]] as const;
+export const ROCKS = [[21.8,-1.5],[44,-4],[53,-5.6],[75.2,-1.3],[83,-4],[98.6,-7]] as const;
 export interface VoyageState { x:number; z:number; velocity:number; speed:number; elapsed:number; checkpoint:number; gates:number; bump:number; cooldown:number }
-export const voyageStart=():VoyageState=>({x:5,z:-4,velocity:0,speed:.24,elapsed:0,checkpoint:0,gates:0,bump:0,cooldown:0});
+export const voyageStart=():VoyageState=>({x:5,z:-4,velocity:0,speed:1.44,elapsed:0,checkpoint:0,gates:0,bump:0,cooldown:0});
 /** Soft impacts slow forward progress and push away; checkpoints never discard the route. */
 export function sailStep(v:VoyageState,keys:Set<string>,dt:number,assist:boolean):VoyageState{
  const n={...v},t=n.elapsed+=dt;
@@ -48,10 +49,10 @@ export function sailStep(v:VoyageState,keys:Set<string>,dt:number,assist:boolean
  const steer=assist?voyageClamp(((target?.[1]??-4)-n.z)*1.7,-1,1):Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft'));
  n.velocity+=(steer*3.5+Math.sin(t*1.55)*.15-n.velocity*5)*dt;
  n.z=voyageClamp(n.z+n.velocity*dt,-7.4,-.6);
- const desired=keys.has('KeyS')?.13:keys.has('KeyW')?.34:assist?.30:.245;
+ const desired=keys.has('KeyS')?.78:keys.has('KeyW')?2.04:assist?1.8:1.47;
  n.speed+=(desired-n.speed)*dt*3.5;
- n.x=Math.min(22,n.x+n.speed*dt);
- if(n.cooldown===0){for(const [x,z] of ROCKS){if(Math.hypot((x-n.x)*1.3,z-n.z)<.78){n.velocity=(n.z>z?1:-1)*1.6;n.speed=.04;n.bump=.75;n.cooldown=2.2;break;}}}
+ n.x=Math.min(VOYAGE_END,n.x+n.speed*dt);
+ if(n.cooldown===0){for(const [x,z] of ROCKS){if(Math.hypot((x-n.x)*1.3,z-n.z)<.78){n.velocity=(n.z>z?1:-1)*1.6;n.speed=.24;n.bump=.75;n.cooldown=2.2;break;}}}
  GATES.forEach(([x,z],i)=>{if(v.x<x&&n.x>=x){n.checkpoint=i+1;if(Math.abs(n.z-z)<1.1)n.gates|=1<<i;}});
  return n;
 }
