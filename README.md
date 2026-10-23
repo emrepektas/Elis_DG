@@ -1,6 +1,6 @@
 # A small birthday journey
 
-A Turkish miniature 3D birthday journey for a laptop, with responsive touch controls. Vite + React + TypeScript + Three.js / React Three Fiber, with a static encrypted content package. The Pages project path is `/Elis_DG/`.
+A Turkish third-person miniature 3D adventure for a laptop. Vite + React + TypeScript + Three.js / React Three Fiber, with a static encrypted content package. The Pages project path is `/Elis_DG/`.
 
 ## Local development
 
@@ -8,15 +8,17 @@ Use Node 24. Run `npm ci`, `npm run pack:private`, and `npm run dev`. The author
 
 Run `npm run typecheck`, `npm test`, and `npm run build`. Build runs a publication audit. Automated security tests use only synthetic fixtures and can run without private authoring inputs.
 
-For the complete browser walkthrough, build and start `npm run preview`, then run `npm run test:e2e`. The browser runner reads the local private story/password without printing either. Set `PREVIEW_URL` to test another preview or deployed Pages site, `BROWSER=webkit` for WebKit, and `BROWSER_EXECUTABLE` if Chromium is installed at a custom path. Otherwise install the matching browser with `npx playwright install chromium`; the runner also recognizes the existing Windows Chromium cache. Screenshots and renderer counts are saved outside the checkout in `../private/qa/miniature/`.
+For the complete browser walkthrough, build and start `npm run preview`, then run `npm run test:e2e`. The Chromium runner reads the local private story/password without printing either. Set `PREVIEW_URL` to test another preview or deployed Pages site and `BROWSER_EXECUTABLE` for a custom Chromium path. Otherwise install the matching browser with `npx playwright install chromium`; the runner also recognizes the existing Windows Chromium cache. Screenshots and renderer counts are saved outside the checkout in `../private/qa/third-person/`.
 
 ## Visual direction
 
-The world uses original procedural geometry: turquoise water, a sunny coast, a small red-sailed boat, rounded travellers, a keepsake notebook and a flower garden. The route contains crew boarding, a playable pier with jumps, a forgiving buoy course and fishing. Movement supports keyboard and held pointer controls, with assistance available. A map revisits unlocked stops without clearing discoveries; replay starts fresh.
+The continuous world uses original procedural geometry: turquoise water, a sunny coast, a small red-sailed boat, five selectable travellers, a keepsake notebook and a flower garden. The camera follows the chosen character on foot, blends into a boat view, moves close for a red-blanket overnight sequence, reveals the island at dawn, then returns behind the same character on landing. Flower picking grows a carried bouquet, and the winding garden path ends at a rainbow and gift.
+
+Click to capture the mouse. WASD/arrow keys move relative to the camera; mouse movement looks around, Shift runs, Space jumps and E interacts. On the boat, W/S adjust speed and A/D steer. At the fishing stop, E casts, then holding E or repeated presses reels in the notebook. Escape releases the mouse. Reading a note or notebook releases it automatically; the primary continue button recaptures it. A guide can walk the route, fishing has an assist, and cinematics can be skipped. The memories menu reopens collected flower notes and the discovered sticker notebook. Replay clears the route and returns to character selection.
 
 Supplied sticker images retain their original appearance and proportions in the notebook. Only referenced private assets are packaged; the earlier background archive remains local. Audio is an original browser-generated piano motif and ocean ambience, silent until explicitly enabled. Reduced motion and an ambient pause are available. WebGL context failure leaves a 2D view with accessible alternatives for completing the route.
 
-`npm run test:motion` verifies simultaneous touch movement/jumping, pointer cancellation and normal-motion boarding/reeling in Chromium. Renderer measurements are diagnostics from the test machine, not a physical-phone performance guarantee. In Windows WebKit, opening the PDF produces a download; both access paths are checked for exact original bytes. The final real voucher still needs a phone opening test.
+`npm run test:motion` runs the normal-motion keyboard/mouse journey. The full runner also checks the assisted reduced-motion route, long-note scrolling, refresh locking, audio consent/disposal, context-loss fallback and a synthetic original PDF's opening and exact-byte downloading. Renderer measurements are diagnostics from the test machine. The actual voucher remains deferred and needs its own opening/download check before delivery.
 
 ## Content protection
 
@@ -30,7 +32,7 @@ Never commit the raw chat export, private story, original sticker archive, unenc
 
 The current content may contain an explicitly marked development placeholder. To integrate the original file, put it in `../private/assets/` using a unique filename stem. In the private story's `voucher`, set `status: "ready"`, `assetId` to that stem, `filename` to its intended download filename, `mime` to its actual MIME type, and include accurate description and instructions. A code and/or HTTPS redemption URL can also be supplied in the encrypted voucher data. Preserve the original file bytes. Run packaging and checks, then open and save the voucher in a phone browser before sharing the gift.
 
-The final personal note is also deferred. Set `note.status` to `ready` and fill `note.paragraphs` with the author's final text. Until then, the note is explicitly marked pending. Story version 2 is validated both during packaging and after authenticated decryption.
+The final personal note is also deferred. Set `note.status` to `ready` and fill `note.paragraphs` with the author's final text. Until then, the note is explicitly marked pending. Story version 3, including exactly five unique avatar choices, is validated both during packaging and after authenticated decryption.
 
 ## GitHub Pages
 

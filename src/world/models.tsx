@@ -90,7 +90,7 @@ export function Boat({ children, animate = true, position = [0, 0, 0], yaw = -.1
     <Box at={[.69, .62, 0]} scale={[.16, .075, 1]} color="#e7cd92" />
     <Pole from={[-.48, .58, -.1]} to={[-.48, 3.55, -.1]} radius={.045} color="#a6794f" />
     <Pole from={[-.46, 1.15, -.12]} to={[1.39, 1.29, -.12]} radius={.034} color="#a6794f" />
-    <mesh ref={sail} geometry={sailGeometry} position={[-.45, 1.29, -.1]} castShadow><meshStandardMaterial color="#f2605d" side={THREE.DoubleSide} roughness={.82} /></mesh>
+    <mesh name="red-sail" ref={sail} geometry={sailGeometry} position={[-.45, 1.29, -.1]} castShadow><meshStandardMaterial color="#f2605d" side={THREE.DoubleSide} roughness={.82} /></mesh>
     <Pole from={[-.46, 3.46, -.13]} to={[1.35, 1.34, -.13]} radius={.012} color="#f4d4a1" />
     <Pole from={[-1.3, .58, -.1]} to={[-2.05, .46, -.7]} radius={.035} color="#b68a5c" />
     <Ball at={[-2, .44, -.67]} scale={[.27, .035, .12]} color="#ccaa73" />

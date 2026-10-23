@@ -15,9 +15,9 @@ function validUrl(value: unknown): boolean {
 /** Validate decrypted inputs before rendering or resolving any asset references. */
 export function validateStory(value: unknown): asserts value is Story {
   const fail = (): never => { throw new Error('Geçersiz yolculuk içeriği.'); };
-  if (!object(value) || value.version !== 2 || !text(value.title, 200) || !text(value.sender, 100) || !text(value.recipient, 100)) fail();
+  if (!object(value) || value.version !== 3 || !text(value.title, 200) || !text(value.sender, 100) || !text(value.recipient, 100)) fail();
   const story = value as RecordValue;
-  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'voucher', 'parcel']);
+  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'avatars', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'voucher', 'parcel']);
   if (Object.keys(story).some(key => !allowed.has(key))) fail();
   if (!object(story.stops) || Object.keys(story.stops).length !== stopIds.length) fail();
   const journeyStops = story.stops as RecordValue;
@@ -39,6 +39,15 @@ export function validateStory(value: unknown): asserts value is Story {
     if (!object(sticker) || !identifier(sticker.id) || !text(sticker.alt, 600) || ![story.sender, story.recipient].includes(sticker.owner) || stickers.has(String(sticker.id))) fail();
     stickers.add((sticker as RecordValue).id as string);
   }
+  const avatarModels = new Set(['blue', 'stone', 'penguin', 'capybara', 'child']);
+  if (!list(story.avatars, 5, 5)) fail();
+  for (const avatar of story.avatars as unknown[]) {
+    if (!object(avatar) || !avatarModels.delete(String(avatar.id)) || !text(avatar.name, 100)) fail();
+    const entry = avatar as RecordValue;
+    if (Object.keys(entry).some(key => !['id', 'name', 'sticker'].includes(key))) fail();
+    if (entry.sticker !== undefined && (!identifier(entry.sticker) || !stickers.has(entry.sticker))) fail();
+  }
+  if (avatarModels.size !== 0) fail();
   if (!list(story.notebook, 3, 3)) fail();
   const shown = new Set<string>();
   for (const page of story.notebook as unknown[]) {
@@ -68,5 +77,5 @@ export function validateStory(value: unknown): asserts value is Story {
 }
 
 export function referencedAssets(story: Story): string[] {
-  return [...new Set([...story.stickers.map(sticker => sticker.id), ...(story.voucher.assetId ? [story.voucher.assetId] : [])])];
+  return [...new Set([...story.stickers.map(sticker => sticker.id), ...story.avatars.flatMap(avatar => avatar.sticker ? [avatar.sticker] : []), ...(story.voucher.assetId ? [story.voucher.assetId] : [])])];
 }

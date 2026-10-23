@@ -9,7 +9,12 @@ import type { Story } from '../src/types.ts';
 const password = 'synthetic-test-password-not-a-real-secret';
 const exactBytes = Uint8Array.from([0, 1, 2, 255, 195, 177, 0, 27, 128]);
 const syntheticStory: Story = {
-  version: 2, title: 'Synthetic fixture', sender: 'Sender', recipient: 'Recipient',
+  version: 3, title: 'Synthetic fixture', sender: 'Sender', recipient: 'Recipient',
+  avatars: [
+    { id: 'blue', name: 'Blue' }, { id: 'stone', name: 'Stone', sticker: 'sticker' },
+    { id: 'penguin', name: 'Penguin', sticker: 'sticker' }, { id: 'capybara', name: 'Capybara', sticker: 'sticker' },
+    { id: 'child', name: 'Child', sticker: 'sticker' },
+  ],
   stops: Object.fromEntries(['coast', 'crew', 'penguin', 'sailing', 'fishing', 'notebook', 'garden', 'gifts'].map(id => [id, { title: 'Stop', hint: 'Hint', action: 'Continue' }])) as Story['stops'],
   crew: [{ id: 'one', name: 'One', model: 'blue' }, { id: 'two', name: 'Two', model: 'stone' }],
   stickers: [{ id: 'sticker', alt: 'Generic illustrated figure', owner: 'Sender' }],
@@ -105,11 +110,15 @@ test('package metadata and opaque filenames disclose no private text or filename
   assert.notEqual(other.manifest.payload.iv, fixture.manifest.payload.iv);
 });
 
-test('v2 story validation rejects incomplete progression, unsafe gift links, and hidden legacy content', () => {
+test('v3 story validation rejects incomplete progression, unsafe gift links, and hidden legacy content', () => {
   validateStory(syntheticStory);
   assert.deepEqual(referencedAssets(syntheticStory), ['sticker', 'fixture']);
   for (const change of [
-    { version: 1 }, { stops: {} }, { crew: [{ id: 'one', name: 'One', model: 'blue' }] },
+    { version: 1 }, { version: 2 }, { stops: {} }, { crew: [{ id: 'one', name: 'One', model: 'blue' }] },
+    { avatars: [] },
+    { avatars: syntheticStory.avatars.map(() => ({ id: 'blue', name: 'Repeated' })) },
+    { avatars: syntheticStory.avatars.map(avatar => ({ ...avatar, sticker: 'missing' })) },
+    { avatars: syntheticStory.avatars.map(avatar => ({ ...avatar, draft: 'Unexpected data' })) },
     { stickers: [{ id: 'sticker', alt: 'Figure', owner: 'Unknown' }] },
     { notebook: Array.from({ length: 3 }, () => ({ title: 'Page', text: '', stickers: ['missing'] })) },
     { note: { status: 'pending', paragraphs: ['Unapproved draft'] } },
