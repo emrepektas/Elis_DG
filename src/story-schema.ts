@@ -23,7 +23,7 @@ export function validateStory(value: unknown): asserts value is Story {
   if(story.dialogue!==undefined){
     if(!list(story.dialogue,0,40))fail();
     for(const line of story.dialogue as unknown[]){
-      if(!object(line)||!['coast','sail','fish','haul','bedtime','night','arrival','garden','celebration'].includes(String(line.phase))||!['blue','stone','penguin','capybara','child'].includes(String(line.speaker))||typeof line.start!=='number'||typeof line.end!=='number'||!Number.isFinite(line.start)||!Number.isFinite(line.end)||line.start<0||line.end<=line.start||line.end>120||(line.trigger!==undefined&&!['keys-complete','chest'].includes(String(line.trigger)))||(line.gesture!==undefined&&!['point','laugh','reach','book','sleep','wave'].includes(String(line.gesture)))||!text(line.text,300)||(line.cue!==undefined&&!['babble','laugh','blanket','splash','bell','yawn'].includes(String(line.cue))))fail();
+      if(!object(line)||!['coast','sail','fish','haul','bedtime','night','arrival','garden','celebration'].includes(String(line.phase))||!['blue','stone','penguin','capybara','child'].includes(String(line.speaker))||typeof line.start!=='number'||typeof line.end!=='number'||!Number.isFinite(line.start)||!Number.isFinite(line.end)||line.start<0||line.end<=line.start||line.end>120||(line.trigger!==undefined&&!['keys-complete','chest','wave-near'].includes(String(line.trigger)))||(line.gesture!==undefined&&!['point','laugh','reach','book','sleep','wave'].includes(String(line.gesture)))||!text(line.text,300)||(line.cue!==undefined&&!['babble','laugh','blanket','splash','bell','yawn'].includes(String(line.cue))))fail();
     }
   }
   if (!object(story.stops) || Object.keys(story.stops).length !== stopIds.length) fail();

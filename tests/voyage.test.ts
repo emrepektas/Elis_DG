@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GATES, ROCKS, VOYAGE_END, sailStep, voyageStart, type VoyageState } from '../src/adventure/logic.ts';
+import { GATES, ROCKS, VOYAGE_END, waveWarningReady, sailStep, voyageStart, type VoyageState } from '../src/adventure/logic.ts';
 
 const none = new Set<string>();
 function simulate(state: VoyageState, seconds: number, hz: number, keys = none, assist = false): VoyageState {
@@ -71,3 +71,12 @@ test('forward and brake inputs change travel speed without freezing the crossing
 });
 
 test('the longer course covers six times the old distance at a useful cruising speed',()=>{const state=simulate(voyageStart(),10,60,none,true);assert.ok(state.x-voyageStart().x>15);assert.equal(VOYAGE_END-voyageStart().x,102);assert.ok(GATES[1][0]-GATES[0][0]>=30);});
+
+test('wave warning stays near the accident regardless of throttle',()=>{
+ for(const key of ['KeyW','KeyS','']){
+  let state=voyageStart();let frames=0;
+  while(!waveWarningReady(state.x)&&frames++<18000)state=sailStep(state,new Set(key?[key]:[]),1/60,true);
+  assert.ok(waveWarningReady(state.x));assert.ok(state.x>=VOYAGE_END-12&&state.x<VOYAGE_END-11.8);
+ }
+ assert.equal(waveWarningReady(VOYAGE_END-12.01),false);
+});

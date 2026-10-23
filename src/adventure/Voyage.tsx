@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Ball, Pole } from '../world/models';
 import { GATES, GIFT, ROCKS, type VoyageState } from './logic';
+import { PinkRibbon } from './StoryCallbacks';
 export { voyageStart, sailStep } from './logic';
 export function VoyageMarkers({active,motion,progress}:{active:boolean;motion:boolean;progress:React.MutableRefObject<VoyageState>}){
  const buoys=useRef<THREE.Group>(null),waves=useRef<THREE.Group>(null),largeWave=useRef<THREE.Group>(null);
@@ -18,8 +19,31 @@ export function VoyageMarkers({active,motion,progress}:{active:boolean;motion:bo
  </group>
  </group>;
 }
-export function FruitFlies({motion,party=false}:{motion:boolean;party?:boolean}){
- const group=useRef<THREE.Group>(null);
- useFrame(({clock})=>group.current?.children.forEach((fly,i)=>{const t=motion?clock.elapsedTime:0;const phase=t*1.8+i*2;fly.position.set(Math.sin(phase)*(party?2.3:.4),(party?1.4:.35)+Math.sin(t*2.1+i)*(party?.55:.14),Math.sin(party?phase*2:t*1.5+i*2)*(party?1.1:.35));fly.rotation.y=t*2+i;fly.children.slice(1).forEach((wing,j)=>wing.rotation.z=(j?1:-1)*(.5+Math.sin(t*45)*.45));}));
- return <group name={party?'party-fruit-flies':'arrival-fruit-flies'} position={party?[GIFT[0],.1,GIFT[1]]:[221.8,.06,-2.6]}>{!party&&<><Ball at={[0,.04,0]} scale={[.2,.15,.19]} color="#edb15a"/><Ball at={[.28,.02,.12]} scale={[.14,.13,.15]} color="#e58b72"/></>}<group ref={group}>{Array.from({length:5},(_,i)=><group key={i}><Ball at={[0,0,0]} scale={party?[.075,.055,.095]:[.045,.035,.065]} color="#66503d"/><Ball at={[-.045,.035,0]} scale={[.06,.008,.035]} color="#e2f4f1"/><Ball at={[.045,.035,0]} scale={[.06,.008,.035]} color="#e2f4f1"/>{party&&<mesh position={[0,.17,0]}><octahedronGeometry args={[.04]}/><meshBasicMaterial color={['#ff859e','#ffda78','#84d5dc','#c5a0e9','#a8d18c'][i]}/></mesh>}</group>)}</group></group>;
+export function FruitFlies({motion,party=false,invitation=false}:{motion:boolean;party?:boolean;invitation?:boolean}){
+ const group=useRef<THREE.Group>(null),invitationTime=useRef(0);
+ useFrame(({clock},delta)=>{
+  invitationTime.current=invitation?invitationTime.current+(motion?Math.min(delta,.05):0):0;
+  group.current?.children.forEach((fly,i)=>{
+   const t=motion?clock.elapsedTime:0,phase=t*1.8+i*2;
+   const carrier=invitation&&!party&&i===0;
+   const travel=carrier?(motion?THREE.MathUtils.smoothstep(invitationTime.current,0,8):1):0;
+   const x=Math.sin(phase)*(party?2.3:.4)+(GIFT[0]-221.8)*travel;
+   const y=(party?1.4:carrier?1.5:.35)+Math.sin(t*2.1+i)*(party?.55:.14)+Math.sin(travel*Math.PI)*1.2;
+   const z=Math.sin(party?phase*2:t*1.5+i*2)*(party?1.1:.35)+(GIFT[1]+2.6)*travel;
+   fly.position.set(x,y,z);
+   fly.rotation.y=carrier?-Math.PI/2:t*2+i;
+   fly.userData.invitationProgress=travel;
+   fly.children.filter(child=>child.name==='fly-wing').forEach((wing,j)=>wing.rotation.z=(j?1:-1)*(.5+Math.sin(t*45)*.45));
+  });
+ });
+ return <group name={party?'party-fruit-flies':'arrival-fruit-flies'} position={party?[GIFT[0],.1,GIFT[1]]:[221.8,.06,-2.6]}>
+  {!party&&<><Ball at={[0,.04,0]} scale={[.2,.15,.19]} color="#edb15a"/><Ball at={[.28,.02,.12]} scale={[.14,.13,.15]} color="#e58b72"/></>}
+  <group ref={group}>{Array.from({length:5},(_,i)=><group key={i} name={i===0?'ribbon-carrying-fruit-fly':undefined}>
+   <Ball at={[0,0,0]} scale={party?[.075,.055,.095]:[.045,.035,.065]} color="#66503d"/>
+   <group name="fly-wing"><Ball at={[-.045,.035,0]} scale={[.06,.008,.035]} color="#e2f4f1"/></group>
+   <group name="fly-wing"><Ball at={[.045,.035,0]} scale={[.06,.008,.035]} color="#e2f4f1"/></group>
+   {party&&<group position={[0,-.025,.1]}><PinkRibbon scale={.4}/></group>}
+   {!party&&i===0&&invitation&&<group name="carried-party-ribbon" position={[0,-.16,0]}><PinkRibbon scale={.8}/></group>}
+  </group>)}</group>
+ </group>;
 }

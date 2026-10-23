@@ -1,4 +1,4 @@
-export type Phase = 'welcome' | 'descent' | 'choose' | 'coast' | 'board' | 'sail' | 'overboard' | 'fish' | 'haul' | 'notebook' | 'bedtime' | 'night' | 'arrival' | 'garden' | 'treasure' | 'gifts' | 'celebration';
+export type Phase = 'welcome' | 'descent' | 'choose' | 'coast' | 'board' | 'sail' | 'overboard' | 'fish' | 'haul' | 'drying' | 'notebook' | 'bedtime' | 'night' | 'arrival' | 'garden' | 'treasure' | 'gifts' | 'celebration';
 export type Point = [number, number];
 export const KEYS: Point[] = [[233, 12], [253, -18], [272, 13]];
 export const FLOWERS = KEYS;
@@ -27,8 +27,8 @@ export function walk(w: Walker, keys: Set<string>, yaw: number, delta: number, g
 export const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 export const smooth = (p: number) => { const x = Math.min(1, Math.max(0, p)); return x * x * (3 - 2 * x); };
 export const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
-export const cinematic = (phase: Phase) => ['descent','board','overboard','haul','bedtime','night','arrival','treasure'].includes(phase);
-export const duration: Partial<Record<Phase, number>> = { descent:5.5, board: 2, overboard:4, haul: 1.8, bedtime: 5, night: 20, arrival: 5, treasure:12 };
+export const cinematic = (phase: Phase) => ['descent','board','overboard','haul','drying','bedtime','night','arrival','treasure'].includes(phase);
+export const duration: Partial<Record<Phase, number>> = { descent:5.5, board: 2, overboard:4, haul: 1.8, drying:4, bedtime: 5, night: 20, arrival: 8, treasure:12 };
 export function lightAt(phase: Phase, t: number): number {
   if (phase === 'bedtime') return smooth(t / 5);
   if (phase === 'night') return 1 - smooth((t - 14) / 6);
@@ -56,3 +56,5 @@ export function sailStep(v:VoyageState,keys:Set<string>,dt:number,assist:boolean
  GATES.forEach(([x,z],i)=>{if(v.x<x&&n.x>=x){n.checkpoint=i+1;if(Math.abs(n.z-z)<1.1)n.gates|=1<<i;}});
  return n;
 }
+
+export const waveWarningReady = (boatX:number) => boatX >= VOYAGE_END-12;

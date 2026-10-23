@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef, type Ref } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Ball, Pole } from '../world/models';
@@ -16,6 +16,9 @@ export interface AvatarProps {
   sleeping?: boolean;
   motion?: boolean;
   scale?: number;
+  /** Optional world-space prop interaction; ordinary avatar poses remain unchanged. */
+  rightHandTarget?: THREE.Vector3;
+  rightHandAnchor?: Ref<THREE.Group>;
 }
 
 type XYZ = [number, number, number];
@@ -98,7 +101,7 @@ function Badge() {
 }
 
 /** Procedural toy figures, approximately 1.4 units tall, feet at y=0, facing +Z. */
-export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleeping = false, motion = true, scale = 1 }: AvatarProps) {
+export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleeping = false, motion = true, scale = 1, rightHandTarget, rightHandAnchor }: AvatarProps) {
   sleeping = sleeping || pose === 'sleep';
   const root = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
@@ -108,6 +111,9 @@ export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleepi
   const rightLeg = useRef<THREE.Group>(null);
   const cape = useRef<THREE.Group>(null);
   const phase = useRef(0);
+  const handDirection = useMemo(() => new THREE.Vector3(.055, -.36, .015), []);
+  const handUnitDirection = useMemo(() => new THREE.Vector3(.055, -.36, .015).normalize(), []);
+  const targetDirection = useMemo(() => new THREE.Vector3(), []);
   const poseBlend = useRef({ x: 0, z: 0, y: 0, head: 0, lx: 0, lz: 0, rx: 0, rz: 0, ly: 0, ry: 0 });
   useFrame(({ clock }, delta) => {
     phase.current += Math.min(delta, .05) * (walking && !sleeping ? 8 : 1.6);
@@ -158,10 +164,18 @@ export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleepi
     if (head.current) head.current.rotation.x += blend.head;
     if (leftArm.current) { leftArm.current.rotation.x += blend.lx; leftArm.current.rotation.z += blend.lz; }
     if (rightArm.current) { rightArm.current.rotation.x += blend.rx; rightArm.current.rotation.z += blend.rz; }
+    if (rightArm.current && rightHandTarget && rightArm.current.parent) {
+      rightArm.current.parent.updateWorldMatrix(true, false);
+      targetDirection.copy(rightHandTarget);
+      rightArm.current.parent.worldToLocal(targetDirection).sub(rightArm.current.position);
+      const extension = targetDirection.length() / handDirection.length();
+      rightArm.current.quaternion.setFromUnitVectors(handUnitDirection, targetDirection.normalize());
+      rightArm.current.scale.setScalar(Math.min(1.8, extension));
+    } else if (rightArm.current) rightArm.current.scale.setScalar(1);
     if (leftLeg.current) leftLeg.current.rotation.x += blend.ly;
     if (rightLeg.current) rightLeg.current.rotation.x += blend.ry;
     if (cape.current) cape.current.rotation.x = motion ? .12 + Math.abs(step) * .16 + Math.sin(clock.elapsedTime * 2.1) * .025 : .12;
-  });
+  }, rightHandTarget ? -1 : 0);
 
   const isPenguin = id === 'penguin';
   const isStone = id === 'stone';
@@ -201,6 +215,7 @@ export function Avatar({ id, pose = 'idle', walking = false, bouquet = 0, sleepi
     {[-1, 1].map((s, index) => <group ref={index === 0 ? leftArm : rightArm} key={s} position={[s * armX, .85, 0]}>
       <Ball at={[s * .035, -.17, .005]} scale={isPenguin ? [.085, .29, .12] : isStone ? [.15, .24, .15] : [.105, .245, .115]} color={isChild ? bodyColor : limbColor} rotation={[0, 0, s * .12]} />
       {!isPenguin && <Ball at={[s * .055, -.36, .015]} scale={isStone ? [.13, .11, .15] : [.09, .1, .1]} color={limbColor} />}
+      {index === 1 && <group ref={rightHandAnchor} name="avatar-right-hand-anchor" position={[.055, -.36, .015]} />}
       {index === 0 && bouquet > 0 && <Bouquet count={bouquet} motion={motion && !sleeping} />}
     </group>)}
 

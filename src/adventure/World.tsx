@@ -6,19 +6,20 @@ import { Avatar, AVATAR_IDS, type AvatarId, type AvatarPose } from './Avatars';
 import { Landscape, OpeningClouds } from './Landscape';
 import { HiddenKey, RainbowChest } from './Keys';
 import { Celebration } from './Celebration';
+import { NotebookDrying, HiddenDecoration } from './StoryCallbacks';
 import { TreasureOpening } from './TreasureOpening';
 import { FruitFlies, VoyageMarkers, voyageStart, sailStep } from './Voyage';
 import { Boat, Book, Ball, Box, Flower, Pole } from '../world/models';
 import { FLOWERS, GIFT, VOYAGE_END, canOpenChest, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
 
 export interface Input { keys: Set<string>; yaw: number; pitch: number; press: number }
-export interface Status { phase?:Phase; action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number; checkpoint?:number; gates?:number; voyageEvent?:string }
+export interface Status { phase?:Phase; boatX?:number; action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number; checkpoint?:number; gates?:number; voyageEvent?:string }
 export interface GameProps {
   phase: Phase; avatar: AvatarId; story: Story; flowers: number[];
   input: React.MutableRefObject<Input>; blocked: boolean; motion: boolean; reduced: boolean;
   skip: number; assist: boolean; onPhase: (phase: Phase) => void; onStatus: (status: Status) => void;
   onInteract: (action: string) => void; onFailure: () => void;
-  onAvatar:(id:AvatarId)=>void; dialogueSpeaker?:AvatarId; dialogueGesture?:AvatarPose;
+  onAvatar:(id:AvatarId)=>void; waveCleared?:boolean; dialogueSpeaker?:AvatarId; dialogueGesture?:AvatarPose;
 }
 const clamp = THREE.MathUtils.clamp;
 function Engine(p: GameProps) {
@@ -88,6 +89,7 @@ function Engine(p: GameProps) {
     }
     if(phase==='sail'){
       voyage.current=sailStep(voyage.current,keys,dt,p.assist);
+      if(p.waveCleared===false)voyage.current.x=Math.min(voyage.current.x,VOYAGE_END-6);
       boatPosition.current.set(voyage.current.x,.1,voyage.current.z);
       if(voyage.current.bump>0)action='wave-bump';
       if(boatPosition.current.x>=VOYAGE_END&&!done.current){done.current=true;p.onPhase('overboard');}
@@ -111,7 +113,7 @@ function Engine(p: GameProps) {
     }
     if(dt>0&&duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
       done.current=true;
-      const next:Partial<Record<Phase,Phase>>={descent:'choose',board:'sail',overboard:'fish',treasure:'gifts',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
+      const next:Partial<Record<Phase,Phase>>={descent:'choose',board:'sail',overboard:'fish',treasure:'gifts',haul:'drying',drying:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
       p.onPhase(next[phase]!);
     }
     if(player.current){
@@ -129,9 +131,10 @@ function Engine(p: GameProps) {
     if(bobber.current){bobber.current.visible=phase==='fish'&&fish.current!=='idle';bobber.current.position.set(boatPosition.current.x+2.6,-.02+Math.sin(t*(fish.current==='bite'?12:2))*.05,boatPosition.current.z+2);}
     if(rod.current)rod.current.rotation.z=fish.current==='bite'?Math.sin(t*8)*.04-.15:-.3;
     if(book.current){
-      book.current.visible=['coast','board','sail','overboard','fish','haul','notebook','bedtime','night','arrival','garden','gifts'].includes(phase);
+      book.current.visible=['coast','board','sail','overboard','fish','haul','drying','notebook','bedtime','night','arrival','garden','gifts'].includes(phase);
       let x=-1,y=.83,z=-.12;
       if(phase==='overboard'){const q=smooth(t/3);x=lerp(-1,2.6,q);y=lerp(.83,-.2,q)+Math.sin(q*Math.PI)*.65;z=lerp(-.12,2,q);}
+      if(phase==='drying'){y=.95+(p.motion?Math.sin(t*15)*.07*(1-smooth(t/3)):0);}
       if(phase==='fish'){x=2.6;y=-.1+Math.sin(t*2)*.05;z=2;}
       if(phase==='bedtime'||phase==='night'){const q=phase==='night'?1:smooth(restTime/1.8);x=lerp(-1,.05,q);z=lerp(-.12,-.45,q);y=lerp(.83,.67,q);}
       if(phase==='haul'){const q=smooth(t/1.8);x=lerp(2.6,-1,q);y=lerp(-.1,.83,q)+Math.sin(q*Math.PI)*1.8;z=lerp(2,-.12,q);}
@@ -158,7 +161,7 @@ function Engine(p: GameProps) {
       if(phase==='sail')yaw-=Math.atan2(voyage.current.velocity,Math.max(.1,voyage.current.speed))*.35;
       if(phase==='board'){const q=smooth(t/2);target.lerp(new THREE.Vector3(walker.current.x,.8,walker.current.z),1-q);yaw=lerp(0,-.9,q);}
       if(phase==='overboard'){target.copy(boatPosition.current).add(new THREE.Vector3(1,1,.6));yaw=-.5;range=5.2;height=2.2;}
-      if(phase==='haul'||phase==='notebook'){range=5.8;height=3;}
+      if(phase==='haul'||phase==='drying'||phase==='notebook'){range=5.8;height=3;}
       if(phase==='bedtime'){yaw=lerp(-.8,.9,smooth(restTime/5));range=5.8;height=2.1;}
       if(phase==='night'){const dawn=smooth((t-14)/6);yaw=lerp(.9,-1.4,dawn);range=lerp(5.8,11,dawn);height=lerp(2.1,5,dawn);}
       if(phase==='arrival'){const q=smooth((t-1)/4);target.lerp(new THREE.Vector3(walker.current.x,1,walker.current.z),q);yaw=lerp(-1.2,-Math.PI/2,q);range=lerp(9,5.2,q);height=lerp(4,1.7,q);}
@@ -168,7 +171,7 @@ function Engine(p: GameProps) {
     if(p.dialogueSpeaker){
       if(phase==='arrival'&&p.dialogueSpeaker==='stone'&&p.dialogueGesture==='point'){
         target.set(221.8,.4,-2.6);desired.set(220.1,1.5,.3);
-      }else if(['board','sail','overboard','fish','haul','notebook','bedtime','night','arrival'].includes(phase)){
+      }else if(['board','sail','overboard','fish','haul','drying','notebook','bedtime','night','arrival'].includes(phase)){
         target.copy(boatPosition.current).add(new THREE.Vector3(0,1,0));
         desired.copy(target).add(new THREE.Vector3(-2.6,1.5,5.3));
       }else{
@@ -198,13 +201,15 @@ function Engine(p: GameProps) {
     if(moving!==walking)setWalking(moving);
     report.current+=rawDelta;
     if(report.current>.1){report.current=0;if(Math.abs(night-dark)>.015)setNight(dark);
-      p.onStatus({phase,action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/(VOYAGE_END-5),0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:restTime,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
+      p.onStatus({phase,boatX:boatPosition.current.x,action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/(VOYAGE_END-5),0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:restTime,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
       Object.assign(gl.domElement.dataset,{gesture:p.dialogueGesture??(reaction.current.remaining>0?reaction.current.gesture:'idle'),sleep:String(sleep.current),bookX:String(book.current?.position.x??0),phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),boatZ:String(boatPosition.current.z),checkpoint:String(voyage.current.checkpoint),gates:String(voyage.current.gates),night:String(dark),keys:String(p.flowers.length),bouquet:"0",cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
     }
   });
   const afloat=!['welcome','descent','choose','coast','board','garden','treasure','gifts','celebration'].includes(p.phase);
   const sleepPhase=['bedtime','night'].includes(p.phase);
   const pose=(id:AvatarId):AvatarPose=>{
+    if(p.phase==='drying')return id==='penguin'?(time.current>2.8?'wave':'sleep'):id==='blue'?'book':time.current<2?'sit':'laugh';
+    if(p.phase==='arrival'&&time.current>0&&time.current<1)return id==='capybara'?'point':id==='stone'?'reach':'idle';
     if(p.phase==='arrival')return reaction.current.remaining>0?(reaction.current.gesture==='laugh'?'laugh':id===p.dialogueSpeaker?reaction.current.gesture:'idle'):'idle';
     if(p.dialogueSpeaker===id&&p.dialogueGesture&&p.phase!=='bedtime')return p.dialogueGesture;
     if(p.phase==='bedtime'&&id==='blue')return visualTime.current<1.8?'book':'sleep';
@@ -219,22 +224,24 @@ function Engine(p: GameProps) {
     <Landscape night={night} motion={p.motion} selection={['welcome','descent','choose'].includes(p.phase)} celebration={p.phase==='celebration'}/>
     {(p.phase==='welcome'||p.phase==='descent')&&<OpeningClouds motion={p.motion}/>}
     <VoyageMarkers active={['sail','fish','haul'].includes(p.phase)} motion={p.motion} progress={voyage}/>
-    <FruitFlies motion={p.motion} party={p.phase==='celebration'}/>
+    <FruitFlies motion={p.motion} party={p.phase==='celebration'} invitation={p.phase==='garden'&&p.flowers.includes(2)}/>
     <group ref={player} name={`crew-${p.avatar}`}><Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={0} motion={p.motion}/></group>
     {(p.phase==='choose'||p.phase==='descent')&&<SelectionLineup avatar={p.avatar} motion={p.motion} select={p.onAvatar}/>}
     {p.phase==='treasure'&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><TreasureOpening avatar={p.avatar} motion={p.motion} time={time.current}/></group>}
     {p.phase==='celebration'&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><Celebration motion={p.motion}/></group>}
     <group ref={boat}><Boat animate={p.motion}>
       {afloat&&p.phase!=='arrival'&&p.avatar!=='blue'&&<group position={[-.8,.65,-.12]} rotation={[0,.6,0]}><Avatar id={p.avatar} pose={pose(p.avatar)} scale={.7} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
-      {((afloat&&(p.phase!=='arrival'||p.avatar!=='blue'))||(p.phase==='board'&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" pose={pose('blue')} scale={.67} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
-      {afloat&&p.avatar!=='stone'&&<group position={[-.8,.65,.3]}><Avatar id="stone" pose={pose('stone')} scale={.55} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
-      {afloat&&p.avatar!=='capybara'&&<group position={[-1.05,.65,-.35]}><Avatar id="capybara" pose={pose('capybara')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
-      {afloat&&p.avatar!=='child'&&<group position={[.1,.65,-.36]}><Avatar id="child" pose={pose('child')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
-      {afloat&&p.avatar!=='penguin'&&<group position={[-.1,.65,.4]}><Avatar id="penguin" pose={pose('penguin')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/ ></group>}
+      {((afloat&&p.phase!=='arrival')||(p.phase==='board'&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" pose={pose('blue')} scale={.67} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
+      {afloat&&p.phase!=='arrival'&&p.avatar!=='stone'&&<group position={[-.8,.65,.3]}><Avatar id="stone" pose={pose('stone')} scale={.55} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
+      {afloat&&p.phase!=='arrival'&&p.avatar!=='capybara'&&<group position={[-1.05,.65,-.35]}><Avatar id="capybara" pose={pose('capybara')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
+      {afloat&&p.phase!=='arrival'&&p.avatar!=='child'&&<group position={[.1,.65,-.36]}><Avatar id="child" pose={pose('child')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/></group>}
+      {afloat&&p.phase!=='arrival'&&p.avatar!=='penguin'&&<group position={[-.1,.65,.4]}><Avatar id="penguin" pose={pose('penguin')} scale={.5} motion={p.motion} sleeping={sleepPhase&&(p.phase==='night'||visualTime.current>1.8)}/ ></group>}
       <mesh ref={blanket} geometry={blanketGeometry} position={[.85,.87,0]} rotation={[-Math.PI/2,0,0]}><meshStandardMaterial color="#e85e5c" side={THREE.DoubleSide} roughness={.95}/></mesh>
       <group position={[-1,.75,-.35]}><Ball at={[0,.1,0]} scale={[.09,.13,.09]} color="#ffdda1"/><pointLight ref={lamp} color="#ffc578" intensity={0} distance={6}/></group>
       {p.phase==='fish'&&<group ref={rod} position={[.7,.9,.2]}><Pole from={[0,0,0]} to={[1.5,1.7,.9]} radius={.025} color="#a27b54"/></group>}
     </Boat></group>
+    {p.phase==='arrival'&&<ArrivalCrew avatar={p.avatar} time={time.current} motion={p.motion} pose={pose}/>}
+    {p.phase==='drying'&&<group position={[boatPosition.current.x-1,1.3,boatPosition.current.z]}><NotebookDrying time={time.current} motion={p.motion}/></group>}
     <group ref={wake}>{Array.from({length:10},(_,i)=><mesh key={i}><sphereGeometry args={[1,8,4]}/><meshBasicMaterial color="#e5fff3" transparent opacity={.5}/></mesh>)}</group>
     <group ref={bobber}><Ball at={[0,.1,0]} scale={[.12,.2,.12]} color="#ef8876"/><mesh rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.4,.43,32]}/><meshBasicMaterial color="#fff4d5" side={THREE.DoubleSide}/></mesh></group>
     {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,boatPosition.current.z+2]} color="#fff1ca" radius={.008}/>}
@@ -244,6 +251,9 @@ function Engine(p: GameProps) {
     {(p.phase==='garden'||p.phase==='gifts')&&<Companions walker={walker} avatar={p.avatar} motion={p.motion} walking={walking} hiding={p.flowers.length===3&&distance([walker.current.x,walker.current.z],GIFT)<7} speaker={p.dialogueSpeaker} gesture={p.dialogueGesture}/>}
     {p.phase==='coast'&&<group userData={{actor:true}}>{AVATAR_IDS.filter(id=>id!==p.avatar).map((id,i)=><group key={id} name={`crew-${id}`} rotation={[0,id==='capybara'&&p.dialogueSpeaker==='capybara'?Math.PI:0,0]} position={[-3+i*1.4,0,-2.6]}><Avatar id={id} pose={pose(id)} scale={.8} motion={p.motion}/></group>)}</group>}
   </>;
+}
+function ArrivalCrew({avatar,time,motion,pose}:{avatar:AvatarId;time:number;motion:boolean;pose:(id:AvatarId)=>AvatarPose}){
+ return <>{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=>{const q=smooth((time-3-i*.55)/1.5);return <group key={id} name={`arrival-crew-${id}`} position={[lerp(218-i*.1,221-i*.5,q),lerp(.75,0,q)+(motion?Math.sin(q*Math.PI)*.8:0),lerp(-4+i*.13,-3+i*.6,q)]} rotation={[0,id==='capybara'&&time<.7?-Math.PI/2:Math.PI/2,0]}><Avatar id={id} scale={id==='penguin'?.65:.8} pose={q>0&&q<1?'cheer':pose(id)} rightHandTarget={id==='capybara'&&time>=.7&&time<1.2?new THREE.Vector3(223,1,-4):undefined} motion={motion}/></group>})}</>;
 }
 function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;select:(id:AvatarId)=>void}){
   const models=useRef<(THREE.Group|null)[]>([]);
@@ -262,6 +272,6 @@ function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;
 function Companions({walker,avatar,motion,walking,speaker,gesture,hiding}:{hiding:boolean;speaker?:AvatarId;gesture?:AvatarPose;walker:React.MutableRefObject<Walker>;avatar:AvatarId;motion:boolean;walking:boolean}){
   const refs=useRef<(THREE.Group|null)[]>([]);
   useFrame((_,dt)=>{refs.current.forEach((group,i)=>{if(group){const w=walker.current,side=i%2?1:-1;group.position.lerp(hiding?new THREE.Vector3(GIFT[0]-2.1-Math.floor(i/2)*.7,0,GIFT[1]+side*2.8):new THREE.Vector3(w.x-1.5-Math.floor(i/2)*1.1,0,w.z+side*(1.2+Math.floor(i/2)*.4)),1-Math.exp(-dt*3));group.rotation.y=w.facing;}})});
-  return <>{hiding&&[-1,1].map(side=><group key={side} position={[GIFT[0]-2.5,.45,GIFT[1]+side*2.8]}><Ball at={[0,0,0]} scale={[1.1,.65,.7]} color="#78aa87"/><Ball at={[-.65,-.1,.2]} scale={[.65,.45,.6]} color="#91bb86"/></group>)}{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=><group key={id} ref={node=>{refs.current[i]=node}} name={`crew-${id}`} userData={{actor:true}} position={[221-i*.5,0,-3+i*.6]}><Avatar id={id} scale={id==='penguin'?.65:.8} pose={id===speaker?gesture:'idle'} walking={walking} motion={motion}/></group>)}</>;
+  return <>{hiding&&[-1,1].map(side=><group key={side} position={[GIFT[0]-2.5,.45,GIFT[1]+side*2.8]}><Ball at={[0,0,0]} scale={[1.1,.65,.7]} color="#78aa87"/><Ball at={[-.65,-.1,.2]} scale={[.65,.45,.6]} color="#91bb86"/></group>)}{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=><group key={id} ref={node=>{refs.current[i]=node}} name={`crew-${id}`} userData={{actor:true}} position={[221-i*.5,0,-3+i*.6]}>{id==='capybara'&&<group position={[0,.4,-.3]}><HiddenDecoration motion={motion}/></group>}<Avatar id={id} scale={id==='penguin'?.65:.8} pose={id===speaker?gesture:'idle'} walking={walking} motion={motion}/></group>)}</>;
 }
 export default function GameWorld(props: GameProps){return <Canvas shadows dpr={[1,1.5]} camera={{fov:52,near:.1,far:900,position:[-7,3,11]}} gl={{antialias:true,alpha:false}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.1;gl.shadowMap.type=THREE.PCFSoftShadowMap;}}><Engine {...props}/></Canvas>}
