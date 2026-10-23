@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Story } from '../types';
-import { Avatar, type AvatarId } from './Avatars';
-import { Landscape } from './Landscape';
+import { Avatar, AVATAR_IDS, type AvatarId } from './Avatars';
+import { Landscape, OpeningClouds } from './Landscape';
+import { NoteFlower } from './Discoveries';
+import { Celebration } from './Celebration';
 import { Boat, Book, Ball, Box, Flower, Pole } from '../world/models';
 import { FLOWERS, GIFT, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
 
@@ -14,6 +16,7 @@ export interface GameProps {
   input: React.MutableRefObject<Input>; blocked: boolean; motion: boolean; reduced: boolean;
   skip: number; assist: boolean; onPhase: (phase: Phase) => void; onStatus: (status: Status) => void;
   onInteract: (action: string) => void; onFailure: () => void;
+  onAvatar:(id:AvatarId)=>void;
 }
 const clamp = THREE.MathUtils.clamp;
 function Engine(p: GameProps) {
@@ -24,7 +27,7 @@ function Engine(p: GameProps) {
   const book = useRef<THREE.Group>(null), bobber = useRef<THREE.Group>(null), rod = useRef<THREE.Group>(null), wake = useRef<THREE.Group>(null);
   const time = useRef(0), report = useRef(0), done = useRef(false), previous = useRef(p.phase), seenPress = useRef(0);
   const fish = useRef('idle'), fishTime = useRef(0), reel = useRef(0), sleep = useRef(0);
-  const cameraTarget = useRef(new THREE.Vector3(-7,1,6)), cameraPosition = useRef(new THREE.Vector3(-7,3.4,11));
+  const cameraTarget = useRef(new THREE.Vector3(-5.5,29,-15)), cameraPosition = useRef(new THREE.Vector3(-5.5,40,22));
   const active = useRef(true), phaseStartPosition = useRef(new THREE.Vector3());
   const ray=useMemo(()=>new THREE.Raycaster(),[]);
   const [walking, setWalking] = useState(false), [night, setNight] = useState(0);
@@ -40,7 +43,7 @@ function Engine(p: GameProps) {
     if(previous.current===p.phase)return;
     time.current=0; done.current=false; seenPress.current=p.input.current.press;
     phaseStartPosition.current.set(walker.current.x,walker.current.y,walker.current.z);
-    if(p.phase==='choose'){walker.current={...spawn};boatPosition.current.set(5,.1,-4);fish.current='idle';reel.current=0;sleep.current=0;}
+    if(p.phase==='welcome'||p.phase==='choose'){walker.current={...spawn};boatPosition.current.set(5,.1,-4);fish.current='idle';reel.current=0;sleep.current=0;}
     if(p.phase==='coast'){p.input.current.yaw=0;p.input.current.pitch=.05;}
     if(p.phase==='sail')p.input.current.yaw=-.9;
     if(p.phase==='fish'){fish.current='idle';fishTime.current=0;reel.current=0;}
@@ -100,7 +103,7 @@ function Engine(p: GameProps) {
     }
     if(duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
       done.current=true;
-      const next:Partial<Record<Phase,Phase>>={board:'sail',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
+      const next:Partial<Record<Phase,Phase>>={descent:'choose',board:'sail',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
       p.onPhase(next[phase]!);
     }
     if(player.current){
@@ -122,7 +125,13 @@ function Engine(p: GameProps) {
     // Camera mode changes follow a continuous position/target blend instead of replacing the world.
     const land=['coast','garden','gifts'].includes(phase),selected=phase==='choose';
     let target=new THREE.Vector3(walker.current.x,walker.current.y+1,walker.current.z),desired=new THREE.Vector3();
-    if(selected){target.set(-5.5,1,2);desired.set(-5.5,3.1,8.4);}
+    if(phase==='welcome'||phase==='descent'){
+      const q=phase==='welcome'?0:smooth(t/5.5);
+      target.set(-5.5,lerp(29,1,q),lerp(-15,2,q));
+      desired.set(-5.5,lerp(40,3.6,q),lerp(22,12,q));
+    }
+    else if(phase==='celebration'){target.set(60,1.3,-6);desired.set(60,4.7,3);}
+    else if(selected){target.set(-5.5,1,2);desired.set(-5.5,3.6,12);}
     else if(land){const yaw=p.input.current.yaw,pitch=p.input.current.pitch;desired.set(target.x+Math.sin(yaw)*5.2*Math.cos(pitch),target.y+1.5+Math.sin(pitch)*4,target.z+Math.cos(yaw)*5.2*Math.cos(pitch));}
     else{
       target.copy(boatPosition.current).add(new THREE.Vector3(.3,1,0));
@@ -156,17 +165,19 @@ function Engine(p: GameProps) {
     report.current+=rawDelta;
     if(report.current>.1){report.current=0;if(Math.abs(night-dark)>.015)setNight(dark);
       p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/17,0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t});
-      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),night:String(dark),bouquet:String(p.flowers.length),cameraMode:land?'follow':selected?'selection':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
+      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),night:String(dark),bouquet:String(p.flowers.length),cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
     }
   });
-  const afloat=!['choose','coast','board','arrival','garden','gifts'].includes(p.phase);
+  const afloat=!['welcome','descent','choose','coast','board','arrival','garden','gifts','celebration'].includes(p.phase);
   const sleepPhase=['bedtime','night'].includes(p.phase);
   return <>
     <hemisphereLight ref={sky} args={['#fff4db','#7eaa83',2.1]}/>
     <directionalLight ref={sun} position={[20,32,18]} intensity={2.6} color="#fff0ce" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-38} shadow-camera-right={40} shadow-camera-top={28} shadow-camera-bottom={-30} shadow-normalBias={.04}/>
-    <Landscape night={night} motion={p.motion}/>
+    <Landscape night={night} motion={p.motion} selection={['welcome','descent','choose'].includes(p.phase)} celebration={p.phase==='celebration'}/>
+    {(p.phase==='welcome'||p.phase==='descent')&&<OpeningClouds motion={p.motion}/>}
     <group ref={player}><Avatar id={p.avatar} walking={walking} bouquet={p.flowers.length} motion={p.motion}/></group>
-    {p.phase==='choose'&&<group position={[-5.5,0,2]}><Avatar id={p.avatar} scale={1.55} motion={p.motion}/><mesh rotation={[-Math.PI/2,0,0]} position={[0,.025,0]}><ringGeometry args={[1.05,1.12,48]}/><meshBasicMaterial color="#fff0bd" side={THREE.DoubleSide}/></mesh></group>}
+    {(p.phase==='choose'||p.phase==='descent')&&<SelectionLineup avatar={p.avatar} motion={p.motion} select={p.onAvatar}/>}
+    {p.phase==='celebration'&&<group position={[60,0,-6]}><Celebration motion={p.motion}/></group>}
     <group ref={boat}><Boat animate={p.motion}>
       {afloat&&p.avatar!=='blue'&&<group position={[-.8,.65,-.12]} rotation={[0,.6,0]}><Avatar id={p.avatar} scale={.7} motion={p.motion} sleeping={sleepPhase}/></group>}
       {(afloat||((p.phase==='coast'||p.phase==='board')&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" scale={.67} motion={p.motion} sleeping={sleepPhase}/></group>}
@@ -180,11 +191,25 @@ function Engine(p: GameProps) {
     <group ref={bobber}><Ball at={[0,.1,0]} scale={[.12,.2,.12]} color="#ef8876"/><mesh rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.4,.43,32]}/><meshBasicMaterial color="#fff4d5" side={THREE.DoubleSide}/></mesh></group>
     {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,-2]} color="#fff1ca" radius={.008}/>}
     <group ref={book}><Book open={p.phase==='notebook'}/></group>
-    {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]}>{!p.flowers.includes(i)?<Flower size={1.25} color={['#ed95af','#a990d0','#f0be65'][i]} open/>:<><Pole from={[0,0,0]} to={[0,.18,0]} color="#57845a" radius={.02}/><mesh position={[0,.07,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.15,.2,20]}/><meshBasicMaterial color="#ffedbd" side={THREE.DoubleSide}/></mesh></>}</group>)}
-    <group position={[60,.1,-6]}><Box at={[0,.43,0]} scale={[1,.8,.8]} color="#a9c4a8"/><Box at={[0,.86,0]} scale={[1.08,.14,.88]} color="#d1dfbc"/><Box at={[0,.95,0]} scale={[1.1,.02,.12]} color="#fff0c6"/><Box at={[0,.95,0]} scale={[.12,.02,.9]} color="#fff0c6"/><mesh position={[0,1.06,0]}><torusGeometry args={[.17,.035,8,20]}/><meshStandardMaterial color="#fff0c6"/></mesh></group>
+    {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]} userData={{actor:true}}><NoteFlower index={i} picked={p.flowers.includes(i)} active={p.phase==='garden'&&distance([walker.current.x,walker.current.z],[x,z])<3} motion={p.motion}/></group>)}
+    {p.phase!=='celebration'&&<group position={[60,.1,-6]}><Box at={[0,.43,0]} scale={[1,.8,.8]} color="#a9c4a8"/><Box at={[0,.86,0]} scale={[1.08,.14,.88]} color="#d1dfbc"/><Box at={[0,.95,0]} scale={[1.1,.02,.12]} color="#fff0c6"/><Box at={[0,.95,0]} scale={[.12,.02,.9]} color="#fff0c6"/><mesh position={[0,1.06,0]}><torusGeometry args={[.17,.035,8,20]}/><meshStandardMaterial color="#fff0c6"/></mesh></group>}
     {(p.phase==='garden'||p.phase==='gifts')&&<Companions walker={walker} avatar={p.avatar} motion={p.motion} walking={walking}/>}
-    {p.phase==='coast'&&<group position={[-1.5,0,-2.6]} userData={{actor:true}}>{p.avatar!=='stone'&&<Avatar id="stone" scale={.8} motion={p.motion}/ >}{p.avatar!=='penguin'&&<group position={[-1.4,0,.3]}><Avatar id="penguin" scale={.65} motion={p.motion}/></group>}</group>}
+    {p.phase==='coast'&&<group position={[-1.5,0,-2.6]} userData={{actor:true}}>{p.avatar!=='stone'&&<Avatar id="stone" scale={.8} motion={p.motion}/>}{p.avatar!=='penguin'&&<group position={[-1.4,0,.3]}><Avatar id="penguin" scale={.65} motion={p.motion}/></group>}</group>}
   </>;
+}
+function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;select:(id:AvatarId)=>void}){
+  const models=useRef<(THREE.Group|null)[]>([]);
+  useFrame(({clock},dt)=>models.current.forEach((model,i)=>{
+    if(!model)return;
+    const chosen=AVATAR_IDS[i]===avatar,target=chosen?1.35:1.02;
+    model.scale.lerp(new THREE.Vector3(target,target,target),motion?1-Math.exp(-dt*8):1);
+    model.position.y=motion&&chosen?Math.sin(clock.elapsedTime*1.5)*.035:0;
+    model.rotation.y=motion&&chosen?Math.sin(clock.elapsedTime*.8)*.1:0;
+  }));
+  return <group userData={{actor:true}}>{AVATAR_IDS.map((id,i)=><group key={id} position={[-10+i*2.25,0,2]} onClick={event=>{event.stopPropagation();select(id)}} onPointerOver={()=>{document.body.style.cursor='pointer'}} onPointerOut={()=>{document.body.style.cursor=''}}>
+    <group ref={node=>{models.current[i]=node}}><Avatar id={id} motion={motion}/></group>
+    <mesh position={[0,.025,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.72,avatar===id ? .85 : .76,48]}/><meshBasicMaterial color={avatar===id?'#fff4be':'#fff9df'} transparent opacity={avatar===id?1:.4} side={THREE.DoubleSide}/></mesh>
+  </group>)}</group>;
 }
 function Companions({walker,avatar,motion,walking}:{walker:React.MutableRefObject<Walker>;avatar:AvatarId;motion:boolean;walking:boolean}){
   const a=useRef<THREE.Group>(null),b=useRef<THREE.Group>(null);

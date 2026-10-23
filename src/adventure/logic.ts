@@ -1,4 +1,4 @@
-export type Phase = 'choose' | 'coast' | 'board' | 'sail' | 'fish' | 'haul' | 'notebook' | 'bedtime' | 'night' | 'arrival' | 'garden' | 'gifts';
+export type Phase = 'welcome' | 'descent' | 'choose' | 'coast' | 'board' | 'sail' | 'fish' | 'haul' | 'notebook' | 'bedtime' | 'night' | 'arrival' | 'garden' | 'gifts' | 'celebration';
 export type Point = [number, number];
 export const FLOWERS: Point[] = [[46, 1], [51, 4], [56, -1]];
 export const GIFT: Point = [60, -6];
@@ -25,8 +25,8 @@ export function walk(w: Walker, keys: Set<string>, yaw: number, delta: number, g
 export const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 export const smooth = (p: number) => { const x = Math.min(1, Math.max(0, p)); return x * x * (3 - 2 * x); };
 export const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
-export const cinematic = (phase: Phase) => ['board','haul','bedtime','night','arrival'].includes(phase);
-export const duration: Partial<Record<Phase, number>> = { board: 2, haul: 1.8, bedtime: 3.5, night: 8, arrival: 4 };
+export const cinematic = (phase: Phase) => ['descent','board','haul','bedtime','night','arrival'].includes(phase);
+export const duration: Partial<Record<Phase, number>> = { descent:5.5, board: 2, haul: 1.8, bedtime: 3.5, night: 8, arrival: 4 };
 export function lightAt(phase: Phase, t: number): number {
   if (phase === 'bedtime') return smooth(t / 3.5);
   if (phase === 'night') return 1 - smooth((t - 4.4) / 3.6);

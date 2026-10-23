@@ -4,6 +4,7 @@ export interface Story {
   version: 3;
   avatars: { id: 'blue' | 'stone' | 'penguin' | 'capybara' | 'child'; name: string; sticker?: string }[];
   title: string; recipient: string; sender: string;
+  welcomeTitle?: string;
   stops: Record<Stop, { title: string; hint: string; action: string }>;
   crew: { id: string; name: string; model: 'blue' | 'stone' }[];
   stickers: { id: string; alt: string; owner: string }[];

@@ -67,17 +67,18 @@ function distanceToPath(x: number, z: number) {
 }
 
 /** Hundreds of small flowers use three draw calls, leaving the path and note flowers clear. */
-function Meadow({ motion }: { motion: boolean }) {
+function Meadow({ motion, clearStage=false }: { motion: boolean; clearStage?:boolean }) {
   const stems = useRef<THREE.InstancedMesh>(null), petals = useRef<THREE.InstancedMesh>(null), centers = useRef<THREE.InstancedMesh>(null);
   const flowers = useMemo(() => {
     const out: { x: number; z: number; s: number; color: string }[] = [];
     for (let i = 0; i < 900; i++) {
       const x = 41.5 + rand(i * 5) * 21, z = -12 + rand(i * 5 + 1) * 24;
+      if(clearStage&&x>55&&z>-11&&z<5)continue;
       if (distanceToPath(x, z) < 1.5 || Math.hypot(x - 60, z + 6) < 2.4 || Math.hypot(x - 59, z - 7) < 3.2) continue;
       out.push({ x, z, s: .2 + rand(i * 5 + 2) * .25, color: palette[Math.floor(rand(i * 5 + 3) * palette.length)] });
     }
     return out;
-  }, []);
+  }, [clearStage]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const paint = (t: number) => {
     if (!stems.current || !petals.current || !centers.current) return;
@@ -197,6 +198,61 @@ function Clouds({ motion }: { motion: boolean }) {
   return <instancedMesh ref={ref} args={[undefined, undefined, data.length]}><sphereGeometry args={[1, 10, 6]} /><meshStandardMaterial color="#fff9e9" roughness={1} /></instancedMesh>;
 }
 
+export interface OpeningCloudsProps { motion: boolean }
+
+/** A high, open cloud bank: the camera descends through its central clearing. */
+export function OpeningClouds({ motion }: OpeningCloudsProps) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const clouds = useMemo(() => {
+    const clusters: { x: number; y: number; z: number; size: number }[] = [];
+    // Far banks form a soft horizon below the title, rather than a wall in front of it.
+    for (let row = 0; row < 3; row++) for (let column = 0; column < 9; column++) {
+      const seed = row * 9 + column;
+      clusters.push({ x: -55 + column * 12.5, y: 22 + rand(seed + 710) * 4,
+        z: -20 - row * 14 + rand(seed + 720) * 5, size: 3.7 + rand(seed + 730) * 2.5 });
+    }
+    // Foreground clouds frame the view. The middle stays clear for the descent.
+    for (let side = -1; side <= 1; side += 2) for (let i = 0; i < 5; i++) {
+      clusters.push({ x: -5.5 + side * (14 + i * 3.1), y: 25 + rand(i + side + 755) * 5,
+        z: 16 - i * 8, size: 3.4 + rand(i + side + 765) * 1.8 });
+    }
+    return clusters.flatMap((cloud, index) => Array.from({ length: 5 }, (_, lobe) => {
+      const a = lobe / 5 * Math.PI * 2;
+      return { x: cloud.x + Math.cos(a) * cloud.size * .57,
+        y: cloud.y + (lobe === 1 ? cloud.size * .28 : rand(index * 5 + lobe + 790) * .65),
+        z: cloud.z + Math.sin(a) * cloud.size * .4,
+        size: cloud.size * (.72 + rand(index * 5 + lobe + 850) * .35),
+        phase: index * .73,
+        color: ['#ffffff', '#fffdf3', '#f3faff', '#ffffff', '#f8fcff'][lobe] };
+    }));
+  }, []);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const draw = (time: number) => {
+    const instance = mesh.current;
+    if (!instance) return;
+    clouds.forEach((cloud, i) => {
+      dummy.position.set(cloud.x + Math.sin(time * .045 + cloud.phase) * .65,
+        cloud.y + Math.sin(time * .11 + cloud.phase) * .13, cloud.z);
+      dummy.scale.set(cloud.size * 1.55, cloud.size * .62, cloud.size);
+      dummy.updateMatrix(); instance.setMatrixAt(i, dummy.matrix);
+    });
+    instance.instanceMatrix.needsUpdate = true;
+  };
+  useLayoutEffect(() => {
+    draw(0);
+    clouds.forEach((cloud, i) => mesh.current?.setColorAt(i, new THREE.Color(cloud.color)));
+    if (mesh.current?.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+    mesh.current?.computeBoundingSphere();
+  }, [clouds]);
+  useFrame(({ clock }) => { if (motion) draw(clock.elapsedTime); });
+  return <group name="opening-cloud-bank" userData={{ actor: true }}>
+    <instancedMesh ref={mesh} args={[undefined, undefined, clouds.length]} frustumCulled={false}>
+      <sphereGeometry args={[1, 12, 8]} />
+      <meshStandardMaterial roughness={1} emissive="#d8e8ee" emissiveIntensity={.12} />
+    </instancedMesh>
+  </group>;
+}
+
 function Atmosphere({ night, motion }: { night: number; motion: boolean }) {
   const sky = useRef<THREE.ShaderMaterial>(null), sea = useRef<THREE.ShaderMaterial>(null), stars = useRef<THREE.PointsMaterial>(null), motes = useRef<THREE.Group>(null);
   const uniforms = useMemo(() => ({ night: { value: 0 }, time: { value: 0 } }), []);
@@ -224,14 +280,14 @@ function Atmosphere({ night, motion }: { night: number; motion: boolean }) {
 }
 
 /** The same continuous world remains mounted from walking to sailing and back. */
-export function Landscape({ night, motion }: { night: number; motion: boolean }) {
+export function Landscape({ night, motion, selection=false, celebration=false }: { night: number; motion: boolean; selection?:boolean; celebration?:boolean }) {
   return <group>
     <Atmosphere night={night} motion={motion} /><Clouds motion={motion} />
     <Island /><Island garden />
     <Path points={COAST_PATH} width={1.8} color="#f3dfb2" /><Path points={GARDEN_PATH} width={1.8} />
     <Dock x={3.2} /><Dock x={40} garden />
-    <group userData={{cameraBlocker:true}}><CoastDecor /><Orchard /><GardenDecor /></group>
-    <Meadow motion={motion} />
+    <group userData={{cameraBlocker:true}}>{!selection&&<CoastDecor />}{!celebration&&<Orchard />}<GardenDecor /></group>
+    <Meadow motion={motion} clearStage={celebration}/>
   </group>;
 }
 

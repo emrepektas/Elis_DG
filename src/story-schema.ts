@@ -17,8 +17,9 @@ export function validateStory(value: unknown): asserts value is Story {
   const fail = (): never => { throw new Error('Geçersiz yolculuk içeriği.'); };
   if (!object(value) || value.version !== 3 || !text(value.title, 200) || !text(value.sender, 100) || !text(value.recipient, 100)) fail();
   const story = value as RecordValue;
-  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'avatars', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'voucher', 'parcel']);
+  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'welcomeTitle', 'avatars', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'voucher', 'parcel']);
   if (Object.keys(story).some(key => !allowed.has(key))) fail();
+  if(story.welcomeTitle!==undefined&&!text(story.welcomeTitle,200)) fail();
   if (!object(story.stops) || Object.keys(story.stops).length !== stopIds.length) fail();
   const journeyStops = story.stops as RecordValue;
   for (const id of stopIds) {

@@ -45,25 +45,42 @@ function Smile({ at = [0, 1.01, .281], size = .065, color = '#50768c' }: { at?: 
   </mesh>;
 }
 
-function Bouquet({ count }: { count: number }) {
-  return <group position={[0, -.24, .15]} rotation={[-.25, 0, -.16]}>
-    {Array.from({ length: Math.min(5, Math.max(0, Math.floor(count))) }, (_, i) => {
-      const angle = (i - (Math.min(5, count) - 1) / 2) * .35;
-      const x = Math.sin(angle) * .25;
-      const y = .36 + Math.cos(angle) * .06;
+function Bouquet({ count, motion }: { count: number; motion: boolean }) {
+  const bunch = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (bunch.current) bunch.current.rotation.z = -.14 + (motion ? Math.sin(clock.elapsedTime * 2.2) * .035 : 0);
+  });
+  const total = Math.min(5, Math.max(0, Math.floor(count)));
+  return <group position={[-.12, -.31, -.105]} rotation={[.05, .18, .9]}><group ref={bunch} rotation={[0, 0, -.14]}>
+    <mesh position={[0, .1, 0]} rotation={[Math.PI, 0, 0]} castShadow>
+      <coneGeometry args={[.26, .42, 7, 1, true]} />
+      <meshStandardMaterial color="#fff1c9" side={THREE.DoubleSide} roughness={.85} />
+    </mesh>
+    <mesh position={[0, .04, -.002]} rotation={[0, 0, -.08]}>
+      <torusGeometry args={[.075, .022, 6, 18]} /><meshStandardMaterial color="#e96c83" />
+    </mesh>
+    {[-1, 1].map(s => <group key={s}>
+      <Ball at={[s * .09, .035, -.07]} scale={[.095, .045, .024]} rotation={[0, 0, s * .35]} color="#e96c83" />
+      <Pole from={[s * .03, .015, -.065]} to={[s * .105, -.16, -.06]} radius={.028} color="#e96c83" />
+    </group>)}
+    {Array.from({ length: total }, (_, i) => {
+      const angle = (i - (total - 1) / 2) * .59;
+      const x = Math.sin(angle) * .4;
+      const y = .51 + Math.cos(angle) * .11;
+      const z = i % 2 ? .045 : -.07;
       const color = ['#f391b3', '#fff0b4', '#b99ce8', '#f7b979', '#91d2e7'][i];
       return <group key={i}>
-        <Pole from={[0, -.1, 0]} to={[x, y, 0]} radius={.013} color="#629257" />
-        <Ball at={[x * .5 - .045, y * .5, 0]} scale={[.085, .025, .035]} rotation={[0, 0, -.4]} color="#76ad67" />
-        {Array.from({ length: 5 }, (_, p) => {
-          const a = p / 5 * Math.PI * 2;
-          return <Ball key={p} at={[x + Math.cos(a) * .064, y + Math.sin(a) * .064, .018]} scale={[.057, .057, .025]} color={color} />;
+        <Pole from={[0, -.15, 0]} to={[x, y, z]} radius={.021} color="#568a50" />
+        <Ball at={[x * .5 - .075, y * .5, z]} scale={[.15, .042, .075]} rotation={[0, 0, -.45]} color="#76ad67" />
+        <Ball at={[x * .5 + .08, y * .6, z]} scale={[.13, .035, .065]} rotation={[0, 0, .55]} color="#93bf6e" />
+        {Array.from({ length: 7 }, (_, p) => {
+          const a = p / 7 * Math.PI * 2;
+          return <Ball key={p} at={[x + Math.cos(a) * .113, y + Math.sin(a) * .113, z]} scale={[.104, .105, .066]} color={color} />;
         })}
-        <Ball at={[x, y, .045]} scale={[.036, .036, .022]} color="#e8b24b" />
+        {[-1, 1].map(s => <Ball key={s} at={[x, y, z + s * .067]} scale={[.069, .069, .031]} color="#ffd56f" />)}
       </group>;
     })}
-    <mesh position={[0, .025, .005]} rotation={[0, 0, -.14]}><torusGeometry args={[.032, .012, 5, 12]} /><meshStandardMaterial color="#e9b285" /></mesh>
-  </group>;
+  </group></group>;
 }
 
 function Badge() {
@@ -102,8 +119,10 @@ export function Avatar({ id, walking = false, bouquet = 0, sleeping = false, mot
     if (leftLeg.current) leftLeg.current.rotation.x = step * .43;
     if (rightLeg.current) rightLeg.current.rotation.x = -step * .43;
     if (leftArm.current) {
-      leftArm.current.rotation.x = bouquet > 0 ? -.65 : sleeping ? -.28 : -step * .35;
-      leftArm.current.rotation.z = bouquet > 0 ? -.12 : -.06 + idle * .015;
+      // Carry to the outside of the body: visible from the following camera,
+      // including behind the capybara's cape and the wider stone figure.
+      leftArm.current.rotation.x = bouquet > 0 ? .08 + step * .025 : sleeping ? -.28 : -step * .35;
+      leftArm.current.rotation.z = bouquet > 0 ? -.55 + idle * .025 : -.06 + idle * .015;
     }
     if (rightArm.current) {
       rightArm.current.rotation.x = sleeping ? -.28 : step * .35;
@@ -150,7 +169,7 @@ export function Avatar({ id, walking = false, bouquet = 0, sleeping = false, mot
     {[-1, 1].map((s, index) => <group ref={index === 0 ? leftArm : rightArm} key={s} position={[s * armX, .85, 0]}>
       <Ball at={[s * .035, -.17, .005]} scale={isPenguin ? [.085, .29, .12] : isStone ? [.15, .24, .15] : [.105, .245, .115]} color={isChild ? bodyColor : limbColor} rotation={[0, 0, s * .12]} />
       {!isPenguin && <Ball at={[s * .055, -.36, .015]} scale={isStone ? [.13, .11, .15] : [.09, .1, .1]} color={limbColor} />}
-      {index === 0 && bouquet > 0 && <Bouquet count={bouquet} />}
+      {index === 0 && bouquet > 0 && <Bouquet count={bouquet} motion={motion && !sleeping} />}
     </group>)}
 
     <group ref={head} position={[0, .94, 0]}><group position={[0, -.94, 0]}>
