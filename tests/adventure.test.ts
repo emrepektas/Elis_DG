@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { walk, spawn, lightAt, duration } from '../src/adventure/logic.ts';
+import { walk, spawn, lightAt, duration, KEYS, GIFT, canOpenChest } from '../src/adventure/logic.ts';
 test('third-person movement follows camera heading, diagonal speed is normalized, and boundaries retain a walkable dock', () => {
   const forward = walk(spawn, new Set(['KeyW']), 0, .05, false);
   assert.ok(forward.z < spawn.z && forward.x === spawn.x);
@@ -26,4 +26,24 @@ test('the shore blocks walking into water without snapping the player onto the p
   assert.ok(player.z < -3.1 && player.z > -4.9);
   player=walk(player,new Set(['KeyD']),0,.05,false);
   assert.ok(player.x>2);
+});
+
+test('all three island keys and the rainbow chest are reachable inside the expanded shore bounds', () => {
+  for (const [x,z] of [...KEYS,GIFT]) {
+    const position={...spawn,x,z};
+    assert.deepEqual(walk(position,new Set(),0,0,true),position);
+  }
+  let player={...spawn,x:223,z:-4};
+  for(let i=0;i<1200;i++)player=walk(player,new Set(['KeyD','KeyS','ShiftLeft']),0,.05,true);
+  assert.equal(player.x,289);assert.equal(player.z,31);
+  for(let i=0;i<1200;i++)player=walk(player,new Set(['KeyA','KeyW','ShiftLeft']),0,.05,true);
+  assert.equal(player.x,220.5);assert.equal(player.z,-31);
+  assert.equal(KEYS.length,3);
+  assert.equal(new Set(KEYS.map(([x,z])=>`${x},${z}`)).size,3);
+  for(const [x,z] of KEYS)assert.ok(Math.hypot(x-GIFT[0],z-GIFT[1])>10,'A key must require exploring beyond the chest clearing');
+});
+
+test('the rainbow chest requires all three distinct key identities', () => {
+  for(const incomplete of [[],[0],[1],[2],[0,1],[0,2],[1,2],[0,0,0],[1,1,2],[-1,0,1],[0,1,3]])assert.equal(canOpenChest(incomplete),false);
+  for(const complete of [[0,1,2],[2,0,1],[0,1,1,2]])assert.equal(canOpenChest(complete),true);
 });

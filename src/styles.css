@@ -39,3 +39,18 @@
 .game-selection .avatar-choices button{transition:transform .2s,box-shadow .2s}
 .crew-dialogue{position:absolute;z-index:5;bottom:110px;left:50%;transform:translateX(-50%);width:min(570px,calc(100% - 40px));background:#fff9e9ed;border:1px solid #fffdf1;padding:17px 25px;border-radius:18px;box-shadow:0 10px 40px #193e5e25;text-align:center;pointer-events:none;animation:note-unfold .3s ease}.crew-dialogue strong{display:block;font-size:.72rem;letter-spacing:.07em;color:#668277;margin-bottom:5px}.crew-dialogue p{font-size:1.05rem;line-height:1.6}.in-cinema .crew-dialogue{bottom:calc(5vh + 70px)}.gifts-sheet>h2{margin:20px 0;text-align:center}
 .notebook-sketch{width:100%;height:75px;margin:8px 0 12px}
+
+/* Three collected keys open the rainbow chest. */
+.key-counter{position:absolute;right:26px;bottom:26px;display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid #fffdf0;border-radius:20px;background:#fff9e4ed;box-shadow:0 8px 30px #285c5b17;pointer-events:none;animation:key-found .45s ease both}
+.key-inventory{display:flex;gap:9px}.key-inventory svg{width:31px;height:43px;fill:none;stroke:#9caaab80;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}.key-inventory svg.collected{stroke:#c28a20;filter:drop-shadow(0 0 7px #f8d67399)}
+.key-counter strong,.key-counter small{display:block}.key-counter strong{font-family:Literata,serif;font-size:1.15rem;font-weight:500}.key-counter small{font-size:.78rem;margin-top:4px}
+.key-toast{position:absolute;top:24%;left:50%;transform:translateX(-50%);padding:16px 24px;background:#fff7dbea;border:1px solid #efd191;border-radius:18px;box-shadow:0 8px 35px #75602920;text-align:center;font-weight:800;pointer-events:none;animation:prompt-arrive .25s ease}
+@keyframes key-found{from{opacity:.5;scale:.94}to{opacity:1;scale:1}}
+@media(max-width:750px){.key-counter{right:15px;bottom:15px;gap:8px;padding:10px 13px}.key-inventory{gap:5px}.key-inventory svg{width:23px;height:34px}.key-counter strong{font-size:.9rem}.key-counter small{font-size:.67rem}.key-toast{width:85%;font-size:.9rem}}
+@media(prefers-reduced-motion:reduce){.key-counter,.key-toast{animation:none}}
+
+.welcome-sound-choice{display:flex;align-items:center;flex-direction:column;gap:15px}.welcome-sound-choice .text-button{background:#fff9e6b8;padding:9px 18px;border-radius:22px;color:#234e5c}
+.adventure .dialogue-cinematic{position:absolute;z-index:8;top:auto;bottom:7vh;left:50%;right:auto;transform:translateX(-50%);width:min(820px,calc(100% - 64px));max-height:58vh;overflow-y:auto;background:#fff9e9f5;padding:26px 34px;border-radius:24px;box-shadow:0 12px 65px #18364035;text-align:left;pointer-events:auto;animation:prompt-arrive .5s ease;white-space:normal;}
+.adventure .dialogue-cinematic strong{display:block;font-size:1.05rem;margin-bottom:10px;color:#806032;white-space:normal;overflow:visible;text-overflow:clip}.adventure .dialogue-cinematic p{display:block;font-size:clamp(20px,1.65vw,26px);line-height:1.65;white-space:normal;overflow:visible;text-overflow:clip;-webkit-line-clamp:unset;max-height:none;margin:0 0 22px}.dialogue-cinematic>.primary-button{float:right;padding:12px 25px;min-height:48px}.dialogue-cinematic>small{display:block;clear:both;text-align:right;font-size:.75rem;padding-top:9px;opacity:.65}
+@media(max-width:750px){.adventure .dialogue-cinematic{width:calc(100% - 28px);padding:20px;bottom:5vh;max-height:70vh}.adventure .dialogue-cinematic p{font-size:20px}}
+.welcome-screen{z-index:4}.welcome-sound-choice{pointer-events:auto}.welcome-sound-choice button{pointer-events:auto}

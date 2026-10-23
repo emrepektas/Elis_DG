@@ -4,11 +4,11 @@ import * as THREE from 'three';
 import type { Story } from '../types';
 import { Avatar, AVATAR_IDS, type AvatarId, type AvatarPose } from './Avatars';
 import { Landscape, OpeningClouds } from './Landscape';
-import { NoteFlower } from './Discoveries';
+import { HiddenKey, RainbowChest } from './Keys';
 import { Celebration } from './Celebration';
 import { FruitFlies, VoyageMarkers, voyageStart, sailStep } from './Voyage';
 import { Boat, Book, Ball, Box, Flower, Pole } from '../world/models';
-import { FLOWERS, GIFT, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
+import { FLOWERS, GIFT, canOpenChest, distance, duration, lightAt, lerp, smooth, spawn, walk, type Phase, type Walker } from './logic';
 
 export interface Input { keys: Set<string>; yaw: number; pitch: number; press: number }
 export interface Status { action: string; fish: string; reel: number; progress: number; night: number; x: number; z: number; yaw: number; time: number; checkpoint?:number; gates?:number; voyageEvent?:string }
@@ -17,7 +17,7 @@ export interface GameProps {
   input: React.MutableRefObject<Input>; blocked: boolean; motion: boolean; reduced: boolean;
   skip: number; assist: boolean; onPhase: (phase: Phase) => void; onStatus: (status: Status) => void;
   onInteract: (action: string) => void; onFailure: () => void;
-  onAvatar:(id:AvatarId)=>void;
+  onAvatar:(id:AvatarId)=>void; dialogueSpeaker?:AvatarId;
 }
 const clamp = THREE.MathUtils.clamp;
 function Engine(p: GameProps) {
@@ -49,7 +49,7 @@ function Engine(p: GameProps) {
     if(p.phase==='coast'){p.input.current.yaw=0;p.input.current.pitch=.05;}
     if(p.phase==='sail'){p.input.current.yaw=-.9;voyage.current=voyageStart();}
     if(p.phase==='fish'){fish.current='idle';fishTime.current=0;reel.current=0;}
-    if(p.phase==='garden'){walker.current={...spawn,x:43,z:-4,facing:Math.PI/2};p.input.current.yaw=-Math.PI/2;p.input.current.pitch=.05;}
+    if(p.phase==='garden'){walker.current={...spawn,x:223,z:-4,facing:Math.PI/2};p.input.current.yaw=-Math.PI/2;p.input.current.pitch=.05;}
     previous.current=p.phase;
   },[p.phase]);
   useEffect(()=>{if(duration[p.phase]&&p.skip>0)time.current=duration[p.phase]!;},[p.skip]);
@@ -73,10 +73,10 @@ function Engine(p: GameProps) {
       if(phase==='coast'&&distance([walker.current.x,walker.current.z],[3.8,-4])<2.1)action='board';
       if(phase==='garden'){
         const i=FLOWERS.findIndex(point=>distance([walker.current.x,walker.current.z],point)<2);
-        if(i>=0)action=`${p.flowers.includes(i)?'note':'flower'}-${i}`;
-        else if(distance([walker.current.x,walker.current.z],GIFT)<2.3) action=p.flowers.length===3?'gift':'flowers-needed';
+        if(i>=0&&!p.flowers.includes(i))action=`key-${i}`;
+        else if(distance([walker.current.x,walker.current.z],GIFT)<2.3) action=canOpenChest(p.flowers)?'gift':'keys-needed';
       }
-      if((pressed||autoHit)&&action&&action!=='flowers-needed'&&dt>0)p.onInteract(action);
+      if((pressed||autoHit)&&action&&action!=='keys-needed'&&dt>0)p.onInteract(action);
     }
     if(phase==='board'){
       const q=smooth(t/2); walker.current.x=lerp(phaseStartPosition.current.x,5.3,q);walker.current.z=lerp(phaseStartPosition.current.z,-3.7,q);walker.current.y=Math.sin(q*Math.PI)*1.1+q*.7;
@@ -98,12 +98,12 @@ function Engine(p: GameProps) {
     if(phase==='notebook'){action='book';if(pressed)p.onInteract('book');}
     const dark=lightAt(phase,t);
     sleep.current=phase==='bedtime'?smooth(t/5):phase==='night'?1-smooth((t-16)/4):0;
-    if(phase==='night') boatPosition.current.set(lerp(22,38,smooth(t/20)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
+    if(phase==='night') boatPosition.current.set(lerp(22,218,smooth(t/20)),.1,lerp(boatPosition.current.z,-4,Math.min(1,dt*2)));
     if(phase==='arrival'){
-      boatPosition.current.set(38,.1,-4);
-      const q=smooth((t-8)/4);walker.current.x=lerp(38.5,43,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
+      boatPosition.current.set(218,.1,-4);
+      const q=smooth((t-8)/4);walker.current.x=lerp(218.5,223,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
     }
-    if(duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
+    if(dt>0&&duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
       done.current=true;
       const next:Partial<Record<Phase,Phase>>={descent:'choose',board:'sail',haul:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
       p.onPhase(next[phase]!);
@@ -113,7 +113,7 @@ function Engine(p: GameProps) {
       player.current.position.set(walker.current.x,walker.current.y,walker.current.z);
       player.current.rotation.y=phase==='board'||phase==='arrival'?Math.PI/2:walker.current.facing;
     }
-    if(boat.current){boat.current.position.copy(boatPosition.current);boat.current.rotation.y=phase==='sail'?-voyage.current.velocity*.12:0;boat.current.rotation.z=phase==='sail'&&p.motion?Math.sin(t*1.8)*.055+voyage.current.bump*Math.sin(t*15)*.04:0;boat.current.rotation.x=phase==='sail'&&p.motion?Math.sin(t*1.55)*.045:0;
+    if(boat.current){boat.current.position.copy(boatPosition.current);boat.current.rotation.y=phase==='sail'?-Math.atan2(voyage.current.velocity,Math.max(.1,voyage.current.speed))*.45:0;boat.current.rotation.z=phase==='sail'&&p.motion?Math.sin(t*1.8)*.055+voyage.current.bump*Math.sin(t*15)*.04:0;boat.current.rotation.x=phase==='sail'&&p.motion?Math.sin(t*1.55)*.045:0;
       const sail=boat.current.getObjectByName('red-sail');if(sail){sail.scale.y=1-sleep.current*.98;sail.position.y=1.29-sleep.current*.2;}}
     if(sleeper.current){sleeper.current.rotation.z=-Math.PI/2*sleep.current;sleeper.current.position.y=.65+sleep.current*.03;}
     if(blanket.current){blanket.current.visible=sleep.current>.01;blanket.current.scale.setScalar(Math.max(.01,sleep.current));}
@@ -140,12 +140,13 @@ function Engine(p: GameProps) {
       target.set(-5.5,lerp(29,1,q),lerp(-15,2,q));
       desired.set(-5.5,lerp(40,3.6,q),lerp(22,12,q));
     }
-    else if(phase==='celebration'){target.set(60,1.3,-6);desired.set(60,4.7,3);}
+    else if(phase==='celebration'){target.set(GIFT[0],1.3,GIFT[1]);desired.set(GIFT[0]-11,5,GIFT[1]);}
     else if(selected){target.set(-5.5,1,2);desired.set(-5.5,3.6,12);}
     else if(land){const yaw=p.input.current.yaw,pitch=p.input.current.pitch;desired.set(target.x+Math.sin(yaw)*5.2*Math.cos(pitch),target.y+1.5+Math.sin(pitch)*4,target.z+Math.cos(yaw)*5.2*Math.cos(pitch));}
     else{
       target.copy(boatPosition.current).add(new THREE.Vector3(.3,1,0));
       let yaw=p.input.current.yaw,range=7.5,height=3.5;
+      if(phase==='sail')yaw-=Math.atan2(voyage.current.velocity,Math.max(.1,voyage.current.speed))*.35;
       if(phase==='board'){const q=smooth(t/2);target.lerp(new THREE.Vector3(walker.current.x,.8,walker.current.z),1-q);yaw=lerp(0,-.9,q);}
       if(phase==='haul'||phase==='notebook'){range=5.8;height=3;}
       if(phase==='bedtime'){yaw=lerp(-.8,.9,smooth(t/5));range=5.8;height=2.1;}
@@ -153,7 +154,19 @@ function Engine(p: GameProps) {
       if(phase==='arrival'){const q=smooth((t-8)/4);target.lerp(new THREE.Vector3(walker.current.x,1,walker.current.z),q);yaw=lerp(-1.2,-Math.PI/2,q);range=lerp(9,5.2,q);height=lerp(4,1.7,q);}
       desired.set(target.x+Math.sin(yaw)*range,target.y+height,target.z+Math.cos(yaw)*range);
     }
-    if(phase==='arrival'&&t>=3&&t<7){target.set(41.8,.3,-2.6);desired.set(40.4,1.25,-.7);}
+    if(phase==='arrival'&&t>=3&&t<7){target.set(221.8,.3,-2.6);desired.set(220.4,1.25,-.7);}
+    if(p.dialogueSpeaker){
+      if(phase==='arrival'&&p.dialogueSpeaker==='stone'){
+        target.set(221.8,.4,-2.6);desired.set(220.1,1.5,.3);
+      }else if(['board','sail','fish','haul','notebook','bedtime','night','arrival'].includes(phase)){
+        target.copy(boatPosition.current).add(new THREE.Vector3(0,1,0));
+        desired.copy(target).add(new THREE.Vector3(-2.6,1.5,5.3));
+      }else{
+        let speaker:THREE.Object3D|undefined;
+        scene.traverse(object=>{if(object.name!==`crew-${p.dialogueSpeaker}`)return;let parent:THREE.Object3D|null=object;while(parent){if(!parent.visible)return;parent=parent.parent;}speaker=object;});
+        if(speaker){speaker.getWorldPosition(target);target.y+=.9;const heading=p.dialogueSpeaker===p.avatar?walker.current.facing:0;desired.copy(target).add(new THREE.Vector3(Math.sin(heading)*4.2,1.15,Math.cos(heading)*4.2));}
+      }
+    }
     const blend=p.reduced?1:1-Math.exp(-Math.min(rawDelta,.05)*5.5);
     cameraPosition.current.lerp(desired,blend);cameraTarget.current.lerp(target,blend);camera.position.copy(cameraPosition.current);camera.lookAt(cameraTarget.current);
     if(land){
@@ -176,7 +189,7 @@ function Engine(p: GameProps) {
     report.current+=rawDelta;
     if(report.current>.1){report.current=0;if(Math.abs(night-dark)>.015)setNight(dark);
       p.onStatus({action,fish:fish.current,reel:reel.current,progress:clamp((boatPosition.current.x-5)/17,0,1),night:dark,x:walker.current.x,z:walker.current.z,yaw:p.input.current.yaw,time:t,checkpoint:voyage.current.checkpoint,gates:voyage.current.gates,voyageEvent:phase==='sail'&&voyage.current.bump>0?'bump':''});
-      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),boatZ:String(boatPosition.current.z),checkpoint:String(voyage.current.checkpoint),gates:String(voyage.current.gates),night:String(dark),bouquet:String(p.flowers.length),cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
+      Object.assign(gl.domElement.dataset,{phase,playerX:String(walker.current.x),playerZ:String(walker.current.z),yaw:String(p.input.current.yaw),boatX:String(boatPosition.current.x),boatZ:String(boatPosition.current.z),checkpoint:String(voyage.current.checkpoint),gates:String(voyage.current.gates),night:String(dark),keys:String(p.flowers.length),bouquet:"0",cameraY:String(camera.position.y),cameraMode:land?'follow':selected?'selection':phase==='welcome'?'clouds':phase==='celebration'?'celebration':['sail','fish'].includes(phase)?'boat':'cinematic',phaseTime:String(t),renderCalls:String(gl.info.render.calls),triangles:String(gl.info.render.triangles)});
     }
   });
   const afloat=!['welcome','descent','choose','coast','board','garden','gifts','celebration'].includes(p.phase);
@@ -196,12 +209,12 @@ function Engine(p: GameProps) {
     {(p.phase==='welcome'||p.phase==='descent')&&<OpeningClouds motion={p.motion}/>}
     <VoyageMarkers active={['sail','fish','haul'].includes(p.phase)} motion={p.motion} progress={voyage}/>
     <FruitFlies motion={p.motion}/>
-    <group ref={player}><Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={p.flowers.length} motion={p.motion}/></group>
+    <group ref={player} name={`crew-${p.avatar}`}><Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={0} motion={p.motion}/></group>
     {(p.phase==='choose'||p.phase==='descent')&&<SelectionLineup avatar={p.avatar} motion={p.motion} select={p.onAvatar}/>}
-    {p.phase==='celebration'&&<group position={[60,0,-6]}><Celebration motion={p.motion}/></group>}
+    {p.phase==='celebration'&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><Celebration motion={p.motion}/></group>}
     <group ref={boat}><Boat animate={p.motion}>
       {afloat&&p.phase!=='arrival'&&p.avatar!=='blue'&&<group position={[-.8,.65,-.12]} rotation={[0,.6,0]}><Avatar id={p.avatar} pose={pose(p.avatar)} scale={.7} motion={p.motion} sleeping={sleepPhase}/></group>}
-      {((afloat&&(p.phase!=='arrival'||p.avatar!=='blue'))||((p.phase==='coast'||p.phase==='board')&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" pose={pose('blue')} scale={.67} motion={p.motion} sleeping={sleepPhase}/></group>}
+      {((afloat&&(p.phase!=='arrival'||p.avatar!=='blue'))||(p.phase==='board'&&p.avatar!=='blue'))&&<group ref={sleeper} position={[.4,.65,0]}><Avatar id="blue" pose={pose('blue')} scale={.67} motion={p.motion} sleeping={sleepPhase}/></group>}
       {afloat&&p.avatar!=='stone'&&<group position={[-.8,.65,.3]}><Avatar id="stone" pose={pose('stone')} scale={.55} motion={p.motion} sleeping={sleepPhase}/></group>}
       {afloat&&p.avatar!=='capybara'&&<group position={[-1.05,.65,-.35]}><Avatar id="capybara" pose={pose('capybara')} scale={.5} motion={p.motion} sleeping={sleepPhase}/></group>}
       {afloat&&p.avatar!=='child'&&<group position={[.1,.65,-.36]}><Avatar id="child" pose={pose('child')} scale={.5} motion={p.motion} sleeping={sleepPhase}/></group>}
@@ -214,10 +227,10 @@ function Engine(p: GameProps) {
     <group ref={bobber}><Ball at={[0,.1,0]} scale={[.12,.2,.12]} color="#ef8876"/><mesh rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.4,.43,32]}/><meshBasicMaterial color="#fff4d5" side={THREE.DoubleSide}/></mesh></group>
     {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,boatPosition.current.z+2]} color="#fff1ca" radius={.008}/>}
     <group ref={book}><Book open={p.phase==='notebook'}/></group>
-    {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]} userData={{actor:true}}><NoteFlower index={i} picked={p.flowers.includes(i)} active={p.phase==='garden'&&distance([walker.current.x,walker.current.z],[x,z])<3} motion={p.motion}/></group>)}
-    {p.phase!=='celebration'&&<group position={[60,.1,-6]}><Box at={[0,.43,0]} scale={[1,.8,.8]} color="#a9c4a8"/><Box at={[0,.86,0]} scale={[1.08,.14,.88]} color="#d1dfbc"/><Box at={[0,.95,0]} scale={[1.1,.02,.12]} color="#fff0c6"/><Box at={[0,.95,0]} scale={[.12,.02,.9]} color="#fff0c6"/><mesh position={[0,1.06,0]}><torusGeometry args={[.17,.035,8,20]}/><meshStandardMaterial color="#fff0c6"/></mesh></group>}
+    {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]} userData={{actor:true}}><HiddenKey index={i} collected={p.flowers.includes(i)} nearby={distance([walker.current.x,walker.current.z],[x,z])<11} motion={p.motion}/></group>)}
+    {p.phase!=='celebration'&&<group position={[GIFT[0],.1,GIFT[1]]}><RainbowChest keys={p.flowers.length} open={p.phase==='gifts'} motion={p.motion}/></group>}
     {(p.phase==='garden'||p.phase==='gifts')&&<Companions walker={walker} avatar={p.avatar} motion={p.motion} walking={walking}/>}
-    {p.phase==='coast'&&<group position={[-1.5,0,-2.6]} userData={{actor:true}}>{p.avatar!=='stone'&&<Avatar id="stone" pose={pose('stone')} scale={.8} motion={p.motion}/>}{p.avatar!=='penguin'&&<group position={[-1.4,0,.3]}><Avatar id="penguin" pose={pose('penguin')} scale={.65} motion={p.motion}/></group>}</group>}
+    {p.phase==='coast'&&<group userData={{actor:true}}>{AVATAR_IDS.filter(id=>id!==p.avatar).map((id,i)=><group key={id} name={`crew-${id}`} position={[-3+i*1.4,0,-2.6]}><Avatar id={id} pose={pose(id)} scale={.8} motion={p.motion}/></group>)}</group>}
   </>;
 }
 function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;select:(id:AvatarId)=>void}){
@@ -235,8 +248,8 @@ function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;
   </group>)}</group>;
 }
 function Companions({walker,avatar,motion,walking}:{walker:React.MutableRefObject<Walker>;avatar:AvatarId;motion:boolean;walking:boolean}){
-  const a=useRef<THREE.Group>(null),b=useRef<THREE.Group>(null);
-  useFrame((_,dt)=>{[a,b].forEach((ref,i)=>{if(ref.current){const w=walker.current;ref.current.position.lerp(new THREE.Vector3(w.x-1.2-i*.7,0,w.z+1+i*.5),1-Math.exp(-dt*3));ref.current.rotation.y=w.facing;}})});
-  return <><group ref={a} userData={{actor:true}} position={[41,0,-3]}><Avatar id={avatar==='blue'?'stone':'blue'} scale={.8} walking={walking} motion={motion}/></group><group ref={b} userData={{actor:true}} position={[40.5,0,-2.5]}><Avatar id={avatar==='penguin'?'stone':'penguin'} scale={.65} walking={walking} motion={motion}/></group></>;
+  const refs=useRef<(THREE.Group|null)[]>([]);
+  useFrame((_,dt)=>{refs.current.forEach((group,i)=>{if(group){const w=walker.current,side=i%2?1:-1;group.position.lerp(new THREE.Vector3(w.x-1.5-Math.floor(i/2)*1.1,0,w.z+side*(1.2+Math.floor(i/2)*.4)),1-Math.exp(-dt*3));group.rotation.y=w.facing;}})});
+  return <>{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=><group key={id} ref={node=>{refs.current[i]=node}} name={`crew-${id}`} userData={{actor:true}} position={[221-i*.5,0,-3+i*.6]}><Avatar id={id} scale={id==='penguin'?.65:.8} walking={walking} motion={motion}/></group>)}</>;
 }
-export default function GameWorld(props: GameProps){return <Canvas shadows dpr={[1,1.5]} camera={{fov:52,near:.1,far:300,position:[-7,3,11]}} gl={{antialias:true,alpha:false}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.1;gl.shadowMap.type=THREE.PCFSoftShadowMap;}}><Engine {...props}/></Canvas>}
+export default function GameWorld(props: GameProps){return <Canvas shadows dpr={[1,1.5]} camera={{fov:52,near:.1,far:900,position:[-7,3,11]}} gl={{antialias:true,alpha:false}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.1;gl.shadowMap.type=THREE.PCFSoftShadowMap;}}><Engine {...props}/></Canvas>}

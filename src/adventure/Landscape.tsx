@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { Ball, Box, Pole } from '../world/models';
 
 type Point = readonly [number, number];
-export const GARDEN_PATH: readonly Point[] = [[43, -4], [46, 0], [49, 4], [53, 2], [56, -3], [60, -6]];
+export const GARDEN_PATH: readonly Point[] = [[43, -4], [49, 1], [53, 12], [63, 4], [73, -18], [82, -3], [92, 13], [98, -6]];
 const COAST_PATH: readonly Point[] = [[-7, 6], [-5, 1], [-1, -3], [3, -4]];
 const rand = (i: number) => { const n = Math.sin(i * 127.17 + 38.1) * 43758.5453; return n - Math.floor(n); };
 const palette = ['#ffb4c4', '#f3c46c', '#c2a5ec', '#fff3ca', '#ee899e', '#8ccad7'];
@@ -19,7 +19,7 @@ function roundedShape(x1: number, z1: number, x2: number, z2: number, r: number)
 
 function Island({ garden = false }: { garden?: boolean }) {
   const geometry = useMemo(() => {
-    const [x1, x2, z1, z2] = garden ? [40, 64, -14, 14] : [-14, 3, -10, 10];
+    const [x1, x2, z1, z2] = garden ? [40, 110, -32, 32] : [-14, 3, -10, 10];
     const base = roundedShape(x1, z1, x2, z2, 2);
     const inner = roundedShape(x1 + .45, z1 + .45, x2 - .45, z2 - .45, 1.8);
     const cliff = new THREE.ExtrudeGeometry(base, { depth: 1.15, bevelEnabled: false, steps: 1, curveSegments: 8 });
@@ -71,10 +71,10 @@ function Meadow({ motion, clearStage=false }: { motion: boolean; clearStage?:boo
   const stems = useRef<THREE.InstancedMesh>(null), petals = useRef<THREE.InstancedMesh>(null), centers = useRef<THREE.InstancedMesh>(null);
   const flowers = useMemo(() => {
     const out: { x: number; z: number; s: number; color: string }[] = [];
-    for (let i = 0; i < 900; i++) {
-      const x = 41.5 + rand(i * 5) * 21, z = -12 + rand(i * 5 + 1) * 24;
-      if(clearStage&&x>55&&z>-11&&z<5)continue;
-      if (distanceToPath(x, z) < 1.5 || Math.hypot(x - 60, z + 6) < 2.4 || Math.hypot(x - 59, z - 7) < 3.2) continue;
+    for (let i = 0; i < 1400; i++) {
+      const x = 42 + rand(i * 5) * 66, z = -30 + rand(i * 5 + 1) * 60;
+      if(clearStage&&x>92&&z>-12&&z<2)continue;
+      if (distanceToPath(x, z) < 1.5 || Math.hypot(x - 98, z + 6) < 2.4 || Math.hypot(x - 59, z - 7) < 3.2) continue;
       out.push({ x, z, s: .2 + rand(i * 5 + 2) * .25, color: palette[Math.floor(rand(i * 5 + 3) * palette.length)] });
     }
     return out;
@@ -108,8 +108,8 @@ function Orchard() {
     const o = new THREE.Object3D();
     for (let i = 0; i < 32; i++) {
       const side = i % 4, t = (i / 4 | 0) / 7;
-      const x = side === 0 ? 41.1 : side === 1 ? 62.8 : 42.5 + t * 18.5;
-      let z = side === 2 ? -12.4 : side === 3 ? 12.4 : -10.7 + t * 21.4;
+      const x = side === 0 ? 41.1 : side === 1 ? 108.4 : 43 + t * 64;
+      let z = side === 2 ? -30.4 : side === 3 ? 30.4 : -28 + t * 56;
       if (x < 43 && Math.abs(z + 4) < 2.4) z = -10.5;
       const s = .8 + rand(i + 480) * .45;
       o.rotation.set(0, 0, 0); o.position.set(x, 1.1 * s, z); o.scale.set(.13 * s, 2.2 * s, .13 * s); o.updateMatrix(); trunks.current?.setMatrixAt(i, o.matrix);
@@ -119,8 +119,8 @@ function Orchard() {
       }
     }
     for (let i = 0; i < 64; i++) {
-      const x = 41 + rand(i + 800) * 22, z = -12.5 + rand(i + 880) * 25;
-      const valid = distanceToPath(x, z) > 2.4 && Math.hypot(x - 60, z + 6) > 3 && Math.hypot(x - 59, z - 7) > 3.5;
+      const x = 43 + rand(i + 800) * 64, z = -29 + rand(i + 880) * 58;
+      const valid = distanceToPath(x, z) > 2.4 && Math.hypot(x - 98, z + 6) > 3 && Math.hypot(x - 59, z - 7) > 3.5;
       o.position.set(x, .32, z); o.scale.setScalar(valid ? .4 + rand(i + 980) * .4 : 0); o.updateMatrix(); bushes.current?.setMatrixAt(i, o.matrix);
       bushes.current?.setColorAt(i, new THREE.Color(i % 3 ? '#82b479' : '#a3c77d'));
     }
@@ -172,10 +172,13 @@ function GardenDecor() {
       {Array.from({ length: 7 }, (_, i) => <Pole key={i} from={[i * .8, 0, 0]} to={[i * .8, .8, 0]} radius={.045} color="#efe2bf" />)}
       {[.3, .63].map(y => <Pole key={y} from={[0, y, 0]} to={[4.8, y, 0]} radius={.035} color="#efe2bf" />)}
     </group>
+    <group position={[53,0,12]}><Box at={[-1.5,.5,-1]} scale={[1.6,.16,.6]} color="#e3cba0"/>{[-2,-1].map(x=><Box key={x} at={[x,.22,-1]} scale={[.1,.45,.5]} color="#b79568"/>)}<Ball at={[-2.1,.25,.9]} scale={[.7,.35,.6]} color="#c5bd9f"/></group>
+    <group position={[73,0,-18]}>{[-1,1].map(x=><group key={x}><Pole from={[x*1.6,0,-1]} to={[x*1.6,3,-1]} radius={.12} color="#d4b788"/><Ball at={[x*1.6,3,-1]} scale={[1.3,1.1,1.2]} color="#94bb7c"/></group>)}</group>
+    <group position={[92,0,13]}><mesh position={[1.8,.027,0]} rotation={[-Math.PI/2,0,0]} scale={[1.3,2,1]}><circleGeometry args={[1,32]}/><meshStandardMaterial color="#83c8c0"/></mesh><Ball at={[.4,.18,-1]} scale={[.6,.28,.5]} color="#d1c7ad"/></group>
     {/* A low flower-framed rainbow marks the destination in the distance. */}
-    <group position={[60, .08, -8]}>
-      {['#eea2ad', '#f0bb89', '#f3db96', '#a9ca97', '#91c7cf', '#b0b4dc', '#c5a8cd'].map((c, i) => <mesh key={c} position={[0, .08, 0]}><torusGeometry args={[3.3 - i * .125, .075, 5, 48, Math.PI]} /><meshStandardMaterial color={c} emissive={c} emissiveIntensity={.09} roughness={.65} /></mesh>)}
-      {[-1, 1].map(s => <group key={s}><Ball at={[s * 3, .12, 0]} scale={[.75, .27, .4]} color="#fff4db" /><Ball at={[s * 3.35, .2, 0]} scale={[.4, .35, .3]} color="#fff4db" /></group>)}
+    <group position={[98, .08, -6]} rotation={[0,Math.PI/2,0]}>
+      {['#eea2ad', '#f0bb89', '#f3db96', '#a9ca97', '#91c7cf', '#b0b4dc', '#c5a8cd'].map((c, i) => <mesh key={c} position={[0, .08, 0]}><torusGeometry args={[14 - i * .32, .19, 6, 96, Math.PI]} /><meshStandardMaterial color={c} emissive={c} emissiveIntensity={.09} roughness={.65} /></mesh>)}
+      {[-1, 1].map(s => <group key={s}><Ball at={[s * 13.2, .4, 0]} scale={[2.2, .8, 1.1]} color="#fff4db" /><Ball at={[s * 14.1, .6, 0]} scale={[1.5, 1.1, .9]} color="#fff4db" /></group>)}
     </group>
   </group>;
 }
@@ -268,26 +271,29 @@ function Atmosphere({ night, motion }: { night: number; motion: boolean }) {
     if (motes.current && motion) { motes.current.position.y = Math.sin(uniforms.time.value * .6) * .15; motes.current.rotation.y = Math.sin(uniforms.time.value * .12) * .025; }
   });
   return <>
-    <mesh position={[24, 0, 0]}><sphereGeometry args={[180, 24, 16]} /><shaderMaterial ref={sky} side={THREE.BackSide} depthWrite={false} uniforms={uniforms} vertexShader={'varying vec3 p; void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}'} fragmentShader={'uniform float night; varying vec3 p; void main(){float h=clamp(normalize(p).y,0.,1.); vec3 day=mix(vec3(.67,.85,.9),vec3(.38,.7,.9),pow(h,.55));vec3 dusk=mix(vec3(.12,.16,.26),vec3(.018,.035,.1),pow(h,.4));gl_FragColor=vec4(mix(day,dusk,night),1.);}'} /></mesh>
+    <mesh position={[160, 0, 0]}><sphereGeometry args={[600, 24, 16]} /><shaderMaterial ref={sky} side={THREE.BackSide} depthWrite={false} uniforms={uniforms} vertexShader={'varying vec3 p; void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}'} fragmentShader={'uniform float night; varying vec3 p; void main(){float h=clamp(normalize(p).y,0.,1.); vec3 day=mix(vec3(.67,.85,.9),vec3(.38,.7,.9),pow(h,.55));vec3 dusk=mix(vec3(.12,.16,.26),vec3(.018,.035,.1),pow(h,.4));gl_FragColor=vec4(mix(day,dusk,night),1.);}'} /></mesh>
     <points geometry={starGeometry}><pointsMaterial ref={stars} color="#fff0cf" size={.18} sizeAttenuation transparent opacity={0} depthWrite={false} /></points>
     <mesh position={[-18, 35, -65]}><sphereGeometry args={[3.5, 20, 12]} /><meshBasicMaterial color="#fff1c7" transparent opacity={1 - night * .95} depthWrite={false} /></mesh>
     <mesh position={[41, 30, -63]}><sphereGeometry args={[2.5, 20, 12]} /><meshBasicMaterial color="#f4edcf" transparent opacity={night} depthWrite={false} /></mesh>
-    <mesh position={[23, -.11, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[330, 290]} /><shaderMaterial ref={sea} uniforms={uniforms} vertexShader={'varying vec2 p;varying vec3 w;void main(){p=uv*vec2(330.,290.);w=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}'} fragmentShader={`uniform float time;uniform float night;varying vec2 p;varying vec3 w;void main(){float a=sin(p.x*1.25+p.y*.8+time*.55);float b=sin(p.x*2.1-p.y*1.8-time*.7);float c=sin(p.y*4.+p.x*.5+time*.9);float waves=a*b*.5+.5;vec3 day=mix(vec3(.16,.67,.71),vec3(.37,.85,.8),waves*.55+.2);vec3 dark=mix(vec3(.035,.13,.23),vec3(.1,.24,.34),waves);float glint=pow(max(0.,a*b*c),24.);vec3 color=mix(day,dark,night);color=mix(color,mix(vec3(1.,.99,.8),vec3(.66,.82,.88),night),glint*.85);float haze=smoothstep(45.,150.,length(w.xz-cameraPosition.xz));color=mix(color,mix(vec3(.67,.85,.9),vec3(.12,.16,.26),night),haze);gl_FragColor=vec4(color,1.);}`} /></mesh>
+    <mesh position={[160, -.11, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1000, 1000]} /><shaderMaterial ref={sea} uniforms={uniforms} vertexShader={'varying vec2 p;varying vec3 w;void main(){p=uv*vec2(1000.,1000.);w=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}'} fragmentShader={`uniform float time;uniform float night;varying vec2 p;varying vec3 w;void main(){float a=sin(p.x*1.25+p.y*.8+time*.55);float b=sin(p.x*2.1-p.y*1.8-time*.7);float c=sin(p.y*4.+p.x*.5+time*.9);float waves=a*b*.5+.5;vec3 day=mix(vec3(.16,.67,.71),vec3(.37,.85,.8),waves*.55+.2);vec3 dark=mix(vec3(.035,.13,.23),vec3(.1,.24,.34),waves);float glint=pow(max(0.,a*b*c),24.);vec3 color=mix(day,dark,night);color=mix(color,mix(vec3(1.,.99,.8),vec3(.66,.82,.88),night),glint*.85);float haze=smoothstep(45.,150.,length(w.xz-cameraPosition.xz));color=mix(color,mix(vec3(.67,.85,.9),vec3(.12,.16,.26),night),haze);gl_FragColor=vec4(color,1.);}`} /></mesh>
     <group ref={motes}>
-      {Array.from({ length: 12 }, (_, i) => <mesh key={i} position={[44 + rand(i + 502) * 17, 1.1 + rand(i + 522) * 1.2, -10 + rand(i + 532) * 20]}><sphereGeometry args={[.035, 4, 4]} /><meshBasicMaterial color={i % 2 ? '#fff5b3' : '#ffd9e8'} transparent opacity={.68} /></mesh>)}
+      {Array.from({ length: 12 }, (_, i) => <mesh key={i} position={[224 + rand(i + 502) * 60, 1.1 + rand(i + 522) * 1.2, -25 + rand(i + 532) * 50]}><sphereGeometry args={[.035, 4, 4]} /><meshBasicMaterial color={i % 2 ? '#fff5b3' : '#ffd9e8'} transparent opacity={.68} /></mesh>)}
     </group>
   </>;
 }
+
+function CrossingIslets(){return <group>{[[48,-24,5],[82,31,7],[121,-32,9],[169,26,6]].map(([x,z,r],i)=><group key={i} position={[x,-.6,z]}><mesh scale={[r,.8,r*.75]}><sphereGeometry args={[1,16,8]}/><meshStandardMaterial color="#e8d3a6"/></mesh><mesh position={[0,.65,0]} rotation={[-Math.PI/2,0,0]} scale={[r*.82,r*.6,1]}><circleGeometry args={[1,20]}/><meshStandardMaterial color="#b2ca87"/></mesh><Pole from={[0,.7,0]} to={[.1,3.7,0]} radius={.16} color="#ba9b70"/>{Array.from({length:5},(_,j)=><group key={j} position={[.1,3.7,0]} rotation={[0,j*Math.PI*2/5,0]}><Ball at={[.8,0,0]} scale={[1.25,.16,.35]} color="#86b77f"/></group>)}</group>)}</group>}
 
 /** The same continuous world remains mounted from walking to sailing and back. */
 export function Landscape({ night, motion, selection=false, celebration=false }: { night: number; motion: boolean; selection?:boolean; celebration?:boolean }) {
   return <group>
     <Atmosphere night={night} motion={motion} /><Clouds motion={motion} />
-    <Island /><Island garden />
-    <Path points={COAST_PATH} width={1.8} color="#f3dfb2" /><Path points={GARDEN_PATH} width={1.8} />
-    <Dock x={3.2} /><Dock x={40} garden />
-    <group userData={{cameraBlocker:true}}>{!selection&&<CoastDecor />}{!celebration&&<Orchard />}<GardenDecor /></group>
-    <Meadow motion={motion} clearStage={celebration}/>
+    <Island /><group position={[180,0,0]}><Island garden /></group>
+    <CrossingIslets/>
+    <Path points={COAST_PATH} width={1.8} color="#f3dfb2" /><group position={[180,0,0]}><Path points={GARDEN_PATH} width={1.8} /></group>
+    <Dock x={3.2} /><Dock x={220} garden />
+    <group userData={{cameraBlocker:true}}>{!selection&&<CoastDecor />}<group position={[180,0,0]}>{!celebration&&<Orchard />}<GardenDecor /></group></group>
+    <group position={[180,0,0]}><Meadow motion={motion} clearStage={celebration}/></group>
   </group>;
 }
 

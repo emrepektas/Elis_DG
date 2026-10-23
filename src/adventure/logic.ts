@@ -1,7 +1,9 @@
 export type Phase = 'welcome' | 'descent' | 'choose' | 'coast' | 'board' | 'sail' | 'fish' | 'haul' | 'notebook' | 'bedtime' | 'night' | 'arrival' | 'garden' | 'gifts' | 'celebration';
 export type Point = [number, number];
-export const FLOWERS: Point[] = [[46, 1], [51, 4], [56, -1]];
-export const GIFT: Point = [60, -6];
+export const KEYS: Point[] = [[233, 12], [253, -18], [272, 13]];
+export const FLOWERS = KEYS;
+export const canOpenChest = (collected: number[]) => KEYS.every((_, i) => collected.includes(i));
+export const GIFT: Point = [278, -6];
 export interface Walker { x: number; z: number; y: number; vy: number; facing: number; walking: boolean }
 export const spawn: Walker = { x: -7, z: 6, y: 0, vy: 0, facing: Math.PI, walking: false };
 export function walk(w: Walker, keys: Set<string>, yaw: number, delta: number, garden: boolean): Walker {
@@ -12,8 +14,8 @@ export function walk(w: Walker, keys: Set<string>, yaw: number, delta: number, g
   const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 4 : 2.65;
   const dx = (right * Math.cos(yaw) - ahead * Math.sin(yaw)) * dt * speed;
   const dz = (-right * Math.sin(yaw) - ahead * Math.cos(yaw)) * dt * speed;
-  let x = Math.min(garden ? 63 : 5.3, Math.max(garden ? 40.5 : -13, w.x + dx));
-  const z = Math.min(garden ? 13 : w.x > 2 ? -3.1 : 9, Math.max(garden ? -13 : w.x > 2 ? -4.9 : -9, w.z + dz));
+  let x = Math.min(garden ? 289 : 5.3, Math.max(garden ? 220.5 : -13, w.x + dx));
+  const z = Math.min(garden ? 31 : w.x > 2 ? -3.1 : 9, Math.max(garden ? -31 : w.x > 2 ? -4.9 : -9, w.z + dz));
   // Enter the pier from its mouth; walking towards another part of the shore
   // stops at the bank instead of teleporting sideways onto the planks.
   if(!garden && x>2 && (z < -4.9 || z > -3.1)) x=2;
@@ -44,10 +46,10 @@ export function sailStep(v:VoyageState,keys:Set<string>,dt:number,assist:boolean
  n.cooldown=Math.max(0,n.cooldown-dt); n.bump=Math.max(0,n.bump-dt);
  const target=GATES.find(g=>g[0]>n.x+.3);
  const steer=assist?voyageClamp(((target?.[1]??-4)-n.z)*1.7,-1,1):Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft'));
- n.velocity+=(steer*1.8+Math.sin(t*1.55)*.21-n.velocity*1.6)*dt;
+ n.velocity+=(steer*3.5+Math.sin(t*1.55)*.15-n.velocity*5)*dt;
  n.z=voyageClamp(n.z+n.velocity*dt,-7.4,-.6);
- const desired=keys.has('KeyS')?.17:keys.has('KeyW')?.285:assist?.28:.245;
- n.speed+=(desired-n.speed)*dt*2;
+ const desired=keys.has('KeyS')?.13:keys.has('KeyW')?.34:assist?.30:.245;
+ n.speed+=(desired-n.speed)*dt*3.5;
  n.x=Math.min(22,n.x+n.speed*dt);
  if(n.cooldown===0){for(const [x,z] of ROCKS){if(Math.hypot((x-n.x)*1.3,z-n.z)<.78){n.velocity=(n.z>z?1:-1)*1.6;n.speed=.04;n.bump=.75;n.cooldown=2.2;break;}}}
  GATES.forEach(([x,z],i)=>{if(v.x<x&&n.x>=x){n.checkpoint=i+1;if(Math.abs(n.z-z)<1.1)n.gates|=1<<i;}});

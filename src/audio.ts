@@ -126,6 +126,10 @@ export class JourneyAudio {
         const frequency = base * 2 ** (semitone / 12);
         this.tone(frequency, now + i * 0.14, kind === 'yawn' ? 0.36 : 0.105, 0.2, wave, frequency * (kind === 'laugh' ? 0.85 : 1.12));
       });
+     } else if(kind==='whoosh'||kind==='boat'||kind==='land'){
+      this.rustle(now,.55,.75,kind==='land'?350:1200);this.tone(160,now,.4,.1,'sine',kind==='land'?80:340);
+    } else if(kind==='key'||kind==='unlock'||kind==='chest'){
+      [440,660,880,1320].forEach((hz,i)=>this.tone(hz,now+i*.09,.55,.15,'triangle'));this.rustle(now,.18,.5,kind==='key'?2800:450);
     } else if (kind === 'splash' || kind === 'wave') {
       this.rustle(now, 0.65, 1.3, 900);
       this.tone(100, now, 0.16, 0.15, 'sine', 55);
