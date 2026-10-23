@@ -30,7 +30,7 @@ function Engine(p: GameProps) {
   const book = useRef<THREE.Group>(null), bobber = useRef<THREE.Group>(null), rod = useRef<THREE.Group>(null), wake = useRef<THREE.Group>(null);
   const voyage=useRef(voyageStart());
   const visualTime=useRef(0),reaction=useRef({gesture:'idle' as AvatarPose,remaining:0});
-  const time = useRef(0), report = useRef(0), done = useRef(false), previous = useRef(p.phase), seenPress = useRef(0);
+  const time = useRef(0), report = useRef(0), done = useRef(false), previous = useRef<Phase|undefined>(undefined), seenPress = useRef(0);
   const fish = useRef('idle'), fishTime = useRef(0), reel = useRef(0), sleep = useRef(0);
   const cameraTarget = useRef(new THREE.Vector3(-5.5,29,-15)), cameraPosition = useRef(new THREE.Vector3(-5.5,40,22));
   const active = useRef(true), phaseStartPosition = useRef(new THREE.Vector3());
@@ -51,6 +51,7 @@ function Engine(p: GameProps) {
     if(p.phase==='welcome'||p.phase==='choose'){walker.current={...spawn};boatPosition.current.set(5,.1,-4);fish.current='idle';reel.current=0;sleep.current=0;}
     if(p.phase==='coast'){p.input.current.yaw=0;p.input.current.pitch=.05;}
     if(p.phase==='sail'){p.input.current.yaw=-.9;voyage.current=voyageStart();}
+    if(p.phase==='bedtime'||p.phase==='night'){boatPosition.current.set(VOYAGE_END,.1,-4);p.input.current.yaw=-.8;}
     if(p.phase==='fish'){fish.current='idle';fishTime.current=0;reel.current=0;}
     if(p.phase==='garden'){walker.current={...spawn,x:223,z:-4,facing:Math.PI/2};p.input.current.yaw=-Math.PI/2;p.input.current.pitch=.05;}
     previous.current=p.phase;
