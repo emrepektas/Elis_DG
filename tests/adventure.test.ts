@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { walk, spawn, lightAt, duration, KEYS, GIFT, canOpenChest } from '../src/adventure/logic.ts';
+import { walk, spawn, lightAt, duration, arrivalDialogueBeat, KEYS, GIFT, canOpenChest } from '../src/adventure/logic.ts';
 test('third-person movement follows camera heading, diagonal speed is normalized, and boundaries retain a walkable dock', () => {
   const forward = walk(spawn, new Set(['KeyW']), 0, .05, false);
   assert.ok(forward.z < spawn.z && forward.x === spawn.x);
@@ -46,4 +46,11 @@ test('all three island keys and the rainbow chest are reachable inside the expan
 test('the rainbow chest requires all three distinct key identities', () => {
   for(const incomplete of [[],[0],[1],[2],[0,1],[0,2],[1,2],[0,0,0],[1,1,2],[-1,0,1],[0,1,3]])assert.equal(canOpenChest(incomplete),false);
   for(const complete of [[0,1,2],[2,0,1],[0,1,1,2]])assert.equal(canOpenChest(complete),true);
+});
+
+test('arrival dialogue begins after all passengers land and leaves a beat before the island joke',()=>{
+ assert.equal(arrivalDialogueBeat(0),8);
+ assert.equal(arrivalDialogueBeat(6),8);
+ assert.equal(arrivalDialogueBeat(9),10);
+ assert.ok(duration.arrival!>arrivalDialogueBeat(15));
 });

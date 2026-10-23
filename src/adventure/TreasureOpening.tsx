@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Avatar, type AvatarId } from './Avatars';
+import { ChestBody } from './Chest';
 import { Box } from '../world/models';
 
 interface TreasureOpeningProps { avatar: AvatarId; motion: boolean; time: number }
@@ -118,19 +119,7 @@ export function TreasureOpening({ avatar, motion, time }: TreasureOpeningProps) 
   });
   const displayedTime = motion ? time : 12;
   return <group ref={root} name="treasure-opening" userData={{ actor: true }}>
-    <group name="treasure-chest-base">
-      <Box at={[0, .65, 0]} scale={[2.5, 1.3, 1.6]} color="#b77e4c" />
-      <Box at={[0, 1.31, 0]} scale={[2.23, .045, 1.36]} color="#4c302a" />
-      {[-1, 1].map(x => <Box key={x} at={[x, .65, 0]} scale={[.12, 1.35, 1.68]} color="#e5bf68" />)}
-      <group ref={lid} name="treasure-chest-lid" position={[0, 1.3, -.8]}>
-        <Box at={[0, .11, .8]} scale={[2.58, .3, 1.7]} color="#d39b5e" />
-        {[-1, 1].map(x => <Box key={x} at={[x, .14, .8]} scale={[.13, .35, 1.75]} color="#f1cf77" />)}
-      </group>
-      {[0, 1, 2].map(index => <group key={index} name={`treasure-lock-${index}`} position={[(index - 1) * .57, .91, .86]}>
-        <Box at={[0, 0, 0]} scale={[.34, .35, .13]} color="#f1c866" />
-        <mesh position={[0, .04, .075]}><circleGeometry args={[.045, 12]} /><meshBasicMaterial color="#674d37" /></mesh>
-      </group>)}
-    </group>
+    <ChestBody lidRef={lid}/>
     {[0, 1, 2].map(index => <group key={index} name={`treasure-key-${index}`} ref={element => { keys.current[index] = element; }}><GoldenKey /></group>)}
     <group ref={actor} name="treasure-opener" position={[2, 0, 1.45]}>
       <group ref={actorFacing} rotation={[0, -2.2, 0]}><Avatar id={avatar} pose={displayedTime < 7 ? 'reach' : displayedTime < 9 ? 'point' : 'cheer'} motion={motion} scale={1.15} rightHandAnchor={hand} rightHandTarget={displayedTime < 7 ? handTarget : undefined} /></group>

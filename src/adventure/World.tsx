@@ -19,7 +19,7 @@ export interface GameProps {
   input: React.MutableRefObject<Input>; blocked: boolean; motion: boolean; reduced: boolean;
   skip: number; assist: boolean; onPhase: (phase: Phase) => void; onStatus: (status: Status) => void;
   onInteract: (action: string) => void; onFailure: () => void;
-  onAvatar:(id:AvatarId)=>void; waveCleared?:boolean; dialogueSpeaker?:AvatarId; dialogueGesture?:AvatarPose;
+  onAvatar:(id:AvatarId)=>void; arrivalCleared?:boolean; waveCleared?:boolean; dialogueSpeaker?:AvatarId; dialogueGesture?:AvatarPose;
 }
 const clamp = THREE.MathUtils.clamp;
 function Engine(p: GameProps) {
@@ -59,6 +59,7 @@ function Engine(p: GameProps) {
   useFrame((_,rawDelta)=>{
     const dt = !p.blocked&&active.current ? Math.min(rawDelta,.05):0;
     time.current+=dt;
+    if(p.reduced&&p.phase==='arrival')time.current=Math.max(time.current,10);
     const visualDelta=active.current ? Math.min(rawDelta,.05):0;
     if(p.phase==='bedtime'&&(!p.blocked||p.dialogueSpeaker))visualTime.current+=visualDelta;
     if(p.dialogueGesture){reaction.current={gesture:p.dialogueGesture,remaining:1.2};}else reaction.current.remaining=Math.max(0,reaction.current.remaining-visualDelta);
@@ -111,7 +112,7 @@ function Engine(p: GameProps) {
       boatPosition.current.set(218,.1,-4);
       const q=smooth((t-1)/4);walker.current.x=lerp(218.5,223,q);walker.current.z=-4;walker.current.y=Math.sin(q*Math.PI)*1.4+lerp(.7,0,q);moving=q>.1&&q<.95;
     }
-    if(dt>0&&duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
+    if(dt>0&&(phase!=='arrival'||p.arrivalCleared!==false)&&duration[phase]&&(p.reduced||t>=duration[phase]!)&&!done.current){
       done.current=true;
       const next:Partial<Record<Phase,Phase>>={descent:'choose',board:'sail',overboard:'fish',treasure:'gifts',haul:'drying',drying:'notebook',bedtime:'night',night:'arrival',arrival:'garden'};
       p.onPhase(next[phase]!);
@@ -171,7 +172,7 @@ function Engine(p: GameProps) {
     if(p.dialogueSpeaker){
       if(phase==='arrival'&&p.dialogueSpeaker==='stone'&&p.dialogueGesture==='point'){
         target.set(221.8,.4,-2.6);desired.set(220.1,1.5,.3);
-      }else if(['board','sail','overboard','fish','haul','drying','notebook','bedtime','night','arrival'].includes(phase)){
+      }else if(['board','sail','overboard','fish','haul','drying','notebook','bedtime','night'].includes(phase)){
         target.copy(boatPosition.current).add(new THREE.Vector3(0,1,0));
         desired.copy(target).add(new THREE.Vector3(-2.6,1.5,5.3));
       }else{
@@ -225,7 +226,7 @@ function Engine(p: GameProps) {
     {(p.phase==='welcome'||p.phase==='descent')&&<OpeningClouds motion={p.motion}/>}
     <VoyageMarkers active={['sail','fish','haul'].includes(p.phase)} motion={p.motion} progress={voyage}/>
     <FruitFlies motion={p.motion} party={p.phase==='celebration'} invitation={p.phase==='garden'&&p.flowers.includes(2)}/>
-    <group ref={player} name={`crew-${p.avatar}`}><Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={0} motion={p.motion}/></group>
+    <group ref={player} name={`crew-${p.avatar}`}>{p.avatar==='capybara'&&['garden','gifts'].includes(p.phase)&&<group position={[0,.4,-.3]}><HiddenDecoration motion={p.motion}/></group>}<Avatar id={p.avatar} pose={pose(p.avatar)} walking={walking} bouquet={0} motion={p.motion}/></group>
     {(p.phase==='choose'||p.phase==='descent')&&<SelectionLineup avatar={p.avatar} motion={p.motion} select={p.onAvatar}/>}
     {p.phase==='treasure'&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><TreasureOpening avatar={p.avatar} motion={p.motion} time={time.current}/></group>}
     {p.phase==='celebration'&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><Celebration motion={p.motion}/></group>}
@@ -247,13 +248,13 @@ function Engine(p: GameProps) {
     {p.phase==='fish'&&fish.current!=='idle'&&<Pole from={[boatPosition.current.x+2.2,2.6,boatPosition.current.z+1.1]} to={[boatPosition.current.x+2.6,0,boatPosition.current.z+2]} color="#fff1ca" radius={.008}/>}
     <group ref={book}><Book open={p.phase==='notebook'||(p.phase==='bedtime'&&visualTime.current<1)}/></group>
     {FLOWERS.map(([x,z],i)=><group key={i} position={[x,0,z]} userData={{actor:true}}><HiddenKey index={i} collected={p.flowers.includes(i)} nearby={distance([walker.current.x,walker.current.z],[x,z])<11} motion={p.motion}/></group>)}
-    {!['celebration','treasure'].includes(p.phase)&&<group position={[GIFT[0],.1,GIFT[1]]}><RainbowChest keys={p.flowers.length} open={p.phase==='gifts'} motion={p.motion}/></group>}
+    {!['celebration','treasure'].includes(p.phase)&&<group position={[GIFT[0],0,GIFT[1]]} rotation={[0,-Math.PI/2,0]}><RainbowChest keys={p.flowers.length} open={p.phase==='gifts'} motion={p.motion}/></group>}
     {(p.phase==='garden'||p.phase==='gifts')&&<Companions walker={walker} avatar={p.avatar} motion={p.motion} walking={walking} hiding={p.flowers.length===3&&distance([walker.current.x,walker.current.z],GIFT)<7} speaker={p.dialogueSpeaker} gesture={p.dialogueGesture}/>}
     {p.phase==='coast'&&<group userData={{actor:true}}>{AVATAR_IDS.filter(id=>id!==p.avatar).map((id,i)=><group key={id} name={`crew-${id}`} rotation={[0,id==='capybara'&&p.dialogueSpeaker==='capybara'?Math.PI:0,0]} position={[-3+i*1.4,0,-2.6]}><Avatar id={id} pose={pose(id)} scale={.8} motion={p.motion}/></group>)}</group>}
   </>;
 }
 function ArrivalCrew({avatar,time,motion,pose}:{avatar:AvatarId;time:number;motion:boolean;pose:(id:AvatarId)=>AvatarPose}){
- return <>{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=>{const q=smooth((time-3-i*.55)/1.5);return <group key={id} name={`arrival-crew-${id}`} position={[lerp(218-i*.1,221-i*.5,q),lerp(.75,0,q)+(motion?Math.sin(q*Math.PI)*.8:0),lerp(-4+i*.13,-3+i*.6,q)]} rotation={[0,id==='capybara'&&time<.7?-Math.PI/2:Math.PI/2,0]}><Avatar id={id} scale={id==='penguin'?.65:.8} pose={q>0&&q<1?'cheer':pose(id)} rightHandTarget={id==='capybara'&&time>=.7&&time<1.2?new THREE.Vector3(223,1,-4):undefined} motion={motion}/></group>})}</>;
+ return <>{AVATAR_IDS.filter(id=>id!==avatar).map((id,i)=>{const q=smooth((time-3-i*.55)/1.5);return <group key={id} name={`crew-${id}`} position={[lerp(218-i*.1,221-i*.5,q),lerp(.75,0,q)+(motion?Math.sin(q*Math.PI)*.8:0),lerp(-4+i*.13,-3+i*.6,q)]} rotation={[0,id==='capybara'&&time<.7?-Math.PI/2:Math.PI/2,0]}><Avatar id={id} scale={id==='penguin'?.65:.8} pose={q>0&&q<1?'cheer':pose(id)} rightHandTarget={id==='capybara'&&time>=.7&&time<1.2?new THREE.Vector3(223,1,-4):undefined} motion={motion}/></group>})}</>;
 }
 function SelectionLineup({avatar,motion,select}:{avatar:AvatarId;motion:boolean;select:(id:AvatarId)=>void}){
   const models=useRef<(THREE.Group|null)[]>([]);

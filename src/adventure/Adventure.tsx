@@ -4,7 +4,7 @@ import { JourneyAudio } from '../audio';
 import { AssetImg } from '../components/AssetImg';
 import { Voucher, Parcel } from '../components/Gift';
 import type { AvatarId } from './Avatars';
-import { cinematic, GIFT, waveWarningReady, type Phase } from './logic';
+import { cinematic, GIFT, waveWarningReady, arrivalDialogueBeat, type Phase } from './logic';
 import type { Input, Status } from './World';
 const World=lazy(()=>import('./World'));
 class Boundary extends Component<{children:ReactNode;failed:()=>void},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true}}componentDidCatch(){this.props.failed()}render(){return this.state.failed?null:this.props.children}}
@@ -27,7 +27,7 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  const audio=useRef<JourneyAudio|undefined>(undefined),input=useRef<Input>({keys:new Set(),yaw:0,pitch:.05,press:0});
  const root=useRef<HTMLDivElement>(null),hadCapture=useRef(false);
  const panels=journal||gift||collection||menu;
- const spokenIndex=panels?-1:(story.dialogue??[]).findIndex((line,index)=>line.phase===phase&&!readLines.includes(index)&&(phase!=='sail'||(status.phase===phase&&(line.trigger==='wave-near'?waveWarningReady(status.boatX??0):status.time>=line.start)))&&(!line.trigger||line.trigger==='wave-near'||(flowers.length===3&&(line.trigger==='keys-complete'||Math.hypot(status.x-GIFT[0],status.z-GIFT[1])<6))));
+ const spokenIndex=panels?-1:(story.dialogue??[]).findIndex((line,index)=>line.phase===phase&&!readLines.includes(index)&&(phase!=='arrival'||failed||(status.phase===phase&&status.time>=arrivalDialogueBeat(line.start)))&&(phase!=='sail'||(status.phase===phase&&(line.trigger==='wave-near'?waveWarningReady(status.boatX??0):status.time>=line.start)))&&(!line.trigger||line.trigger==='wave-near'||(flowers.length===3&&(line.trigger==='keys-complete'||Math.hypot(status.x-GIFT[0],status.z-GIFT[1])<6))));
  const spoken=spokenIndex<0?undefined:story.dialogue?.[spokenIndex];
  const modal=panels||!!spoken;
  const controllable=['coast','sail','fish','garden','notebook'].includes(phase);
@@ -74,7 +74,7 @@ export default function Adventure({vault,lock}:{vault:Vault;lock:()=>void}){
  function dismissGift(){if(giftStep===0)nextGift();else finishGift()}
  return <div ref={root} className={`adventure ${cinematic(phase)||spoken?'in-cinema':''} ${reduced?'reduce-motion':''}`} data-phase={phase} data-avatar={avatar} data-keys={flowers.length} data-dialogue={spoken?spokenIndex:undefined}>
   <div className="adventure-world" onClick={()=>{if(['welcome','descent','choose','celebration'].includes(phase))return;if(locked)input.current.press++;else void capture()}}>
-   {!failed?<Boundary failed={()=>setFailed(true)}><Suspense fallback={<p className="world-loading">Dünya hazırlanıyor…</p>}><World phase={phase} avatar={avatar} story={story} flowers={flowers} input={input} blocked={blocked} motion={!reduced&&!hidden} reduced={reduced} skip={skip} assist={assist} onPhase={setPhase} onAvatar={setAvatar} onStatus={setStatus} onInteract={interact} onFailure={()=>setFailed(true)} dialogueSpeaker={spoken?.speaker} dialogueGesture={spoken?.gesture} waveCleared={(story.dialogue??[]).every((line,index)=>line.trigger!=='wave-near'||readLines.includes(index))}/></Suspense></Boundary>:<div className="adventure-fallback"/>}
+   {!failed?<Boundary failed={()=>setFailed(true)}><Suspense fallback={<p className="world-loading">Dünya hazırlanıyor…</p>}><World phase={phase} avatar={avatar} story={story} flowers={flowers} input={input} blocked={blocked} motion={!reduced&&!hidden} reduced={reduced} skip={skip} assist={assist} onPhase={setPhase} onAvatar={setAvatar} onStatus={setStatus} onInteract={interact} onFailure={()=>setFailed(true)} dialogueSpeaker={spoken?.speaker} dialogueGesture={spoken?.gesture} arrivalCleared={(story.dialogue??[]).every((line,index)=>line.phase!=='arrival'||readLines.includes(index))} waveCleared={(story.dialogue??[]).every((line,index)=>line.trigger!=='wave-near'||readLines.includes(index))}/></Suspense></Boundary>:<div className="adventure-fallback"/>}
   </div>
   {!['welcome','choose','descent'].includes(phase)&&<header className="journey-header clean-header"><button className="menu-button" aria-label="Oyun menüsü" onClick={()=>setMenu(true)}>☰ <span>Menü</span></button></header>}
   {spoken&&<aside className="crew-dialogue dialogue-cinematic" aria-live="polite"><strong>{story.avatars.find(person=>person.id===spoken.speaker)?.name}</strong><p>{spoken.text}</p><button className="primary-button" onClick={advanceDialogue}>Devam et <span aria-hidden="true">→</span></button><small>E veya Boşluk</small></aside>}

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { FinalFly } from './FinalFly';
 import { Avatar, type AvatarId, type AvatarPose } from './Avatars';
 
 interface CelebrationProps { motion: boolean }
@@ -68,6 +69,8 @@ function Dancer({ id, x, z, phase, motion, timeline, index }: typeof PARTY[numbe
       if (t < jumpStart) lean = -.12 * Math.sin((t - 22) / (jumpStart - 22) * Math.PI);
     } else if (t < 30) {
       nextPose = 'wave'; spin = Math.sin(t * 1.5 + phase) * .1;
+    } else if(t<38){
+      nextPose='wave';flip=t<31?Math.sin((t-30)*Math.PI)*.18:0;
     } else {
       nextPose = Math.floor((t - 30) / 4) % 3 === 2 ? 'clap' : 'dance';
       hop = Math.max(0, Math.sin(beat + phase)) * (id === 'penguin' ? .24 : .1);
@@ -166,6 +169,6 @@ export function Celebration({ motion }: CelebrationProps) {
   return <group ref={group} name="birthday-celebration" scale={1.3} userData={{ actor: true }}>
     {PARTY.map((dancer, index) => <Dancer key={dancer.id} {...dancer} index={index} timeline={timeline} motion={motion} />)}
     <PartyConfetti motion={motion} timeline={timeline} />
+    <FinalFly motion={motion} timeline={timeline}/>
   </group>;
 }
-
