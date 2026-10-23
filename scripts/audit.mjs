@@ -24,9 +24,6 @@ export async function audit(directory) {
       ...privateStory.note.paragraphs.filter(p => p.length > 20), privateStory.parcel.hint,
       ...privateStory.flowers.map(flower => flower.message), ...privateStory.stickers.map(sticker => sticker.id),
       ...privateStory.crew.map(person => person.name), ...(privateStory.avatars??[]).map(person=>person.name), ...privateStory.motifs);
-    if (privateStory.voucher.code) markers.push(privateStory.voucher.code);
-    if (privateStory.voucher.redemptionUrl) markers.push(privateStory.voucher.redemptionUrl);
-    if (privateStory.voucher.filename) markers.push(privateStory.voucher.filename);
   }
   if (password) markers.push(password);
   async function scan(folder) {

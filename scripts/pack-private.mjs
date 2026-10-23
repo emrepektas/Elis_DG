@@ -11,7 +11,7 @@ const story = JSON.parse(await readFile(path.join(privateRoot, 'story.json'), 'u
 validateStory(story);
 if (story.stickers.length !== 12) throw new Error('The personal journey must preserve all 12 unique stickers.');
 const referenced = referencedAssets(story);
-const types = { '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.pdf': 'application/pdf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
+const types = { '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
 const entries = await readdir(path.join(privateRoot, 'assets'), { withFileTypes: true });
 const assets = [];
 for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {

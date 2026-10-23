@@ -17,7 +17,7 @@ export function validateStory(value: unknown): asserts value is Story {
   const fail = (): never => { throw new Error('Geçersiz yolculuk içeriği.'); };
   if (!object(value) || value.version !== 3 || !text(value.title, 200) || !text(value.sender, 100) || !text(value.recipient, 100)) fail();
   const story = value as RecordValue;
-  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'welcomeTitle', 'dialogue', 'avatars', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'voucher', 'parcel']);
+  const allowed = new Set(['version', 'title', 'sender', 'recipient', 'welcomeTitle', 'dialogue', 'avatars', 'stops', 'crew', 'stickers', 'notebook', 'flowers', 'motifs', 'note', 'parcel']);
   if (Object.keys(story).some(key => !allowed.has(key))) fail();
   if(story.welcomeTitle!==undefined&&!text(story.welcomeTitle,200)) fail();
   if(story.dialogue!==undefined){
@@ -70,19 +70,9 @@ export function validateStory(value: unknown): asserts value is Story {
   if (!object(story.note) || !['pending', 'ready'].includes(String(story.note.status)) || !list(story.note.paragraphs, 0, 12) || story.note.paragraphs.some(paragraph => !text(paragraph, 5000))) fail();
   const note = story.note as RecordValue;
   if ((note.status === 'pending' && (note.paragraphs as unknown[]).length !== 0) || (note.status === 'ready' && (note.paragraphs as unknown[]).length === 0)) fail();
-  if (!object(story.voucher) || !['pending', 'ready'].includes(String(story.voucher.status)) || !text(story.voucher.title, 200) || !text(story.voucher.description, 1500)) fail();
-  const voucher = story.voucher as RecordValue;
-  if (voucher.assetId !== undefined && !identifier(voucher.assetId)) fail();
-  if (voucher.filename !== undefined && (!text(voucher.filename, 240) || /[\\/\r\n]/.test(voucher.filename as string))) fail();
-  if (voucher.mime !== undefined && !text(voucher.mime, 100)) fail();
-  if (voucher.code !== undefined && !text(voucher.code, 500)) fail();
-  if (voucher.redemptionUrl !== undefined && !validUrl(voucher.redemptionUrl)) fail();
-  if (voucher.instructions !== undefined && (!list(voucher.instructions, 0, 12) || voucher.instructions.some(instruction => !text(instruction, 1500)))) fail();
-  if (voucher.status === 'ready' && !voucher.assetId && !voucher.code && !voucher.redemptionUrl) fail();
-  if (voucher.status === 'pending' && (voucher.assetId || voucher.code || voucher.redemptionUrl)) fail();
   if (!object(story.parcel) || !text(story.parcel.hint, 600) || !text(story.parcel.note, 1000)) fail();
 }
 
 export function referencedAssets(story: Story): string[] {
-  return [...new Set([...story.stickers.map(sticker => sticker.id), ...story.avatars.flatMap(avatar => avatar.sticker ? [avatar.sticker] : []), ...(story.voucher.assetId ? [story.voucher.assetId] : [])])];
+  return [...new Set([...story.stickers.map(sticker => sticker.id), ...story.avatars.flatMap(avatar => avatar.sticker ? [avatar.sticker] : [])])];
 }

@@ -13,7 +13,6 @@ export interface Story {
   flowers: { label: string; message: string }[];
   motifs: string[];
   note: { status: 'pending' | 'ready'; paragraphs: string[] };
-  voucher: { status: 'pending' | 'ready'; title: string; description: string; assetId?: string; filename?: string; mime?: string; code?: string; redemptionUrl?: string; instructions?: string[] };
   parcel: { hint: string; note: string };
 }
 export interface AssetData { bytes: Uint8Array; mime: string; filename: string }

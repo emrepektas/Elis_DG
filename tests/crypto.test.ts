@@ -21,7 +21,6 @@ const syntheticStory: Story = {
   notebook: Array.from({ length: 3 }, () => ({ title: 'Page', text: '', stickers: ['sticker'] })),
   flowers: Array.from({ length: 3 }, () => ({ label: 'Flower', message: 'Message' })), motifs: [],
   note: { status: 'pending', paragraphs: [] },
-  voucher: { status: 'ready', title: 'Gift', description: 'Synthetic gift', assetId: 'fixture', filename: 'download.pdf' },
   parcel: { hint: 'Hint', note: 'Note' },
 };
 const fixtureAssets = [{ id: 'fixture', mime: 'application/pdf', filename: 'original.pdf', bytes: exactBytes }, { id: 'sticker', mime: 'image/png', filename: 'image.png', bytes: exactBytes }];
@@ -110,9 +109,9 @@ test('package metadata and opaque filenames disclose no private text or filename
   assert.notEqual(other.manifest.payload.iv, fixture.manifest.payload.iv);
 });
 
-test('v3 story validation rejects incomplete progression, unsafe gift links, and hidden legacy content', () => {
+test('v3 story validation rejects incomplete progression, removed gift content, and hidden legacy content', () => {
   validateStory(syntheticStory);
-  assert.deepEqual(referencedAssets(syntheticStory), ['sticker', 'fixture']);
+  assert.deepEqual(referencedAssets(syntheticStory), ['sticker']);
   for (const change of [
     { version: 1 }, { version: 2 }, { stops: {} }, { crew: [{ id: 'one', name: 'One', model: 'blue' }] },
     { avatars: [] },
@@ -124,7 +123,7 @@ test('v3 story validation rejects incomplete progression, unsafe gift links, and
     { stickers: [{ id: 'sticker', alt: 'Figure', owner: 'Unknown' }] },
     { notebook: Array.from({ length: 3 }, () => ({ title: 'Page', text: '', stickers: ['missing'] })) },
     { note: { status: 'pending', paragraphs: ['Unapproved draft'] } },
-    { voucher: { status: 'ready', title: 'Gift', description: 'Gift', redemptionUrl: 'javascript:alert(1)' } },
+    { voucher: { status: 'ready', assetId: 'forbidden' } },
     { voucher: { status: 'ready', title: 'Gift', description: 'Gift', redemptionUrl: 'https://user:pass@example.com/' } },
     { scenes: [] },
   ]) assert.throws(() => validateStory({ ...syntheticStory, ...change }));
